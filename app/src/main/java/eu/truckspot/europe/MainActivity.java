@@ -9,7 +9,6 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Message;
 import android.webkit.GeolocationPermissions;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -18,155 +17,140 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
-import androidx.webkit.WebViewAssetLoader;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
+
+/** Standalone TruckSpot UI, served from APK using a local HTTPS origin. */
 public final class MainActivity extends Activity {
-    private static final String START_URL = "https://appassets.androidplatform.net/assets/index.html";
-    private static final String TRUSTED_HOST = "appassets.androidplatform.net";
-    private static final int REQUEST_LOCATION = 301;
-
+    private static final String APP_HOST = "appassets.androidplatform.net";
+    private static final String APP_URL = "https://" + APP_HOST + "/assets/index.html";
+    private static final int LOCATION_REQUEST = 301;
     private WebView webView;
-    private WebViewAssetLoader assetLoader;
-    private GeolocationPermissions.Callback waitingCallback;
-    private String waitingOrigin;
+    private GeolocationPermissions.Callback pendingCallback;
+    private String pendingOrigin;
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        getWindow().setStatusBarColor(Color.rgb(10, 17, 15));
-        getWindow().setNavigationBarColor(Color.rgb(10, 17, 15));
-
-        assetLoader = new WebViewAssetLoader.Builder()
-            .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
-            .build();
-
+    @Override public void onCreate(Bundle state) {
+        super.onCreate(state);
+        getWindow().setStatusBarColor(Color.rgb(8, 13, 11));
+        getWindow().setNavigationBarColor(Color.rgb(8, 13, 11));
         webView = new WebView(this);
-        webView.setBackgroundColor(Color.rgb(10, 17, 15));
-        webView.setOverScrollMode(android.view.View.OVER_SCROLL_NEVER);
+        webView.setBackgroundColor(Color.rgb(8, 13, 11));
         setContentView(webView);
-
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setGeolocationEnabled(true);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
+        settings.setAllowFileAccessFromFileURLs(false);
+        settings.setAllowUniversalAccessFromFileURLs(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        settings.setSupportMultipleWindows(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(false);
+        settings.setSupportMultipleWindows(false);
+        settings.setBuiltInZoomControls(false);
 
         webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                return assetLoader.shouldInterceptRequest(request.getUrl());
+            @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
+                return embeddedAsset(req.getUrl());
             }
-
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (!request.isForMainFrame()) return false;
-                Uri destination = request.getUrl();
-                if (trusted(destination)) return false;
-                openOutside(destination);
+                Uri url = request.getUrl();
+                if (isInternal(url)) return false;
+                openOutside(url);
                 return true;
             }
-
-            @Override
-            public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
-                if (request.isForMainFrame()) {
-                    Toast.makeText(MainActivity.this, "Kon TruckSpot niet openen. Probeer opnieuw.", Toast.LENGTH_SHORT).show();
-                }
-            }
         });
-
         webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
-                if (!trusted(Uri.parse(origin))) {
-                    callback.invoke(origin, false, false);
+            @Override public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback cb) {
+                if (!isInternal(Uri.parse(origin))) {
+                    cb.invoke(origin, false, false);
                     return;
                 }
                 if (locationAllowed()) {
-                    callback.invoke(origin, true, false);
+                    cb.invoke(origin, true, false);
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (pendingCallback != null) pendingCallback.invoke(pendingOrigin, false, false);
+                    pendingCallback = cb;
+                    pendingOrigin = origin;
+                    requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION}, LOCATION_REQUEST);
                 } else {
-                    if (waitingCallback != null) waitingCallback.invoke(waitingOrigin, false, false);
-                    waitingCallback = callback;
-                    waitingOrigin = origin;
-                    requestPermissions(
-                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
-                        REQUEST_LOCATION
-                    );
+                    cb.invoke(origin, false, false);
                 }
             }
-
-            @Override
-            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
-                if (!isUserGesture) return false;
-                WebView popup = new WebView(MainActivity.this);
-                popup.setWebViewClient(new WebViewClient() {
-                    private boolean opened = false;
-                    @Override
-                    public void onPageStarted(WebView v, String url, android.graphics.Bitmap favicon) {
-                        if (!opened && url != null) {
-                            opened = true;
-                            openOutside(Uri.parse(url));
-                            v.stopLoading();
-                            v.post(v::destroy);
-                        }
-                    }
-                });
-                WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
-                transport.setWebView(popup);
-                resultMsg.sendToTarget();
-                return true;
-            }
         });
-
-        if (savedInstanceState == null) webView.loadUrl(START_URL);
-        else webView.restoreState(savedInstanceState);
+        if (state != null) webView.restoreState(state);
+        else webView.loadUrl(APP_URL);
     }
 
-    private boolean trusted(Uri uri) {
+    private boolean isInternal(Uri uri) {
         return "https".equalsIgnoreCase(uri.getScheme())
-            && TRUSTED_HOST.equalsIgnoreCase(uri.getHost());
+                && APP_HOST.equalsIgnoreCase(uri.getHost());
     }
-
     private boolean locationAllowed() {
-        return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-            || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        return Build.VERSION.SDK_INT < 23
+                || checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode != REQUEST_LOCATION || waitingCallback == null) return;
-        waitingCallback.invoke(waitingOrigin, locationAllowed(), false);
-        if (!locationAllowed()) {
-            Toast.makeText(this, "Locatie niet toegestaan. De kaart blijft handmatig bruikbaar.", Toast.LENGTH_LONG).show();
-        }
-        waitingCallback = null;
-        waitingOrigin = null;
+    @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] grants) {
+        super.onRequestPermissionsResult(code, permissions, grants);
+        if (code != LOCATION_REQUEST || pendingCallback == null) return;
+        boolean allowed = locationAllowed();
+        pendingCallback.invoke(pendingOrigin, allowed, false);
+        pendingCallback = null;
+        pendingOrigin = null;
+        if (!allowed) Toast.makeText(this, "GPS niet toegestaan. Je kunt handmatig zoeken.", Toast.LENGTH_LONG).show();
     }
-
-    private void openOutside(Uri uri) {
+    private WebResourceResponse embeddedAsset(Uri uri) {
+        if (!isInternal(uri)) return null;
+        String path = uri.getPath();
+        if (path == null || !path.startsWith("/assets/")) return null;
+        String file = path.substring("/assets/".length());
+        if (file.isEmpty() || file.contains("..") || file.contains("\\"))
+            return missing();
+        String mime = "application/octet-stream";
+        if (file.endsWith(".html")) mime = "text/html";
+        else if (file.endsWith(".png")) mime = "image/png";
+        else if (file.endsWith(".js")) mime = "application/javascript";
+        else if (file.endsWith(".css")) mime = "text/css";
+        else if (file.endsWith(".webmanifest")) mime = "application/manifest+json";
+        else if (file.endsWith(".json")) mime = "application/json";
         try {
-            startActivity(new Intent(Intent.ACTION_VIEW, uri));
-        } catch (ActivityNotFoundException | SecurityException ex) {
-            Toast.makeText(this, "Kan de externe link niet openen.", Toast.LENGTH_SHORT).show();
+            InputStream stream = getAssets().open("web/" + file);
+            Map<String, String> headers = new HashMap<>();
+            headers.put("Cache-Control", "no-cache");
+            headers.put("X-Content-Type-Options", "nosniff");
+            return new WebResourceResponse(mime, "UTF-8", 200, "OK", headers, stream);
+        } catch (IOException ignored) { return missing(); }
+    }
+    private WebResourceResponse missing() {
+        return new WebResourceResponse("text/plain", "UTF-8", 404, "Not Found",
+                new HashMap<>(), new ByteArrayInputStream(new byte[0]));
+    }
+    private void openOutside(Uri url) {
+        String scheme = url.getScheme();
+        if (!("https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme))) return;
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, url));
+        } catch (ActivityNotFoundException | SecurityException ignored) {
+            Toast.makeText(this, "Kan deze link niet openen", Toast.LENGTH_SHORT).show();
         }
     }
-
-    @Override
-    public void onBackPressed() {
+    @Override protected void onSaveInstanceState(Bundle b) {
+        if (webView != null) webView.saveState(b);
+        super.onSaveInstanceState(b);
+    }
+    @Override public void onBackPressed() {
         if (webView != null && webView.canGoBack()) webView.goBack();
         else super.onBackPressed();
     }
-
-    @Override
-    protected void onDestroy() {
-        if (waitingCallback != null) {
-            waitingCallback.invoke(waitingOrigin, false, false);
-            waitingCallback = null;
-        }
+    @Override protected void onDestroy() {
+        if (pendingCallback != null) pendingCallback.invoke(pendingOrigin, false, false);
         if (webView != null) webView.destroy();
         super.onDestroy();
     }

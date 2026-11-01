@@ -1,20 +1,21 @@
-# 🚛 TruckSpot Europe — zelfstandige Android-testapp
+# TruckSpot Europe V8 — zelfstandige Android-app
 
-TruckSpot Europe is een gratis prototype voor vrachtwagenchauffeurs. De Android-app bevat nu zijn **eigen ingebouwde startscherm** (net als de Transport Uren-app). Hij verwijst **niet meer naar Netlify tijdens gebruik**.
+De TruckSpot-interface, het logo en de Leaflet-kaartbibliotheek worden **in de APK** opgenomen en vanaf een intern veilig HTTPS-adres geladen. De app laadt bij het openen dus **niet meer de Netlify-website**.
 
-## Werking
-- Startscherm, kaartbediening, logo en zoekfilters zitten in de APK.
-- GPS gebruikt Android-locatietoestemming tijdens gebruik. App-locatie werkt via het beveiligde interne WebView-adres `https://appassets.androidplatform.net/assets/index.html`.
-- OpenStreetMap-kaarttegels, externe parkeerdata en Google Maps / Street View hebben wel internet nodig.
-- Parkeerplaatsen zijn externe gegevens met wisselende dekking; 'bezetting onbekend' betekent geen realtime informatie.
-- De eerste versie importeert de bestaande V7-broncode eenmalig vanuit de bestaande publieke testwebsite en bewaart hem vervolgens in deze repository. Daarna worden de lokale bestanden in volgende APK's gebruikt.
-- Android-app is een testbuild. Geen officiële rijtijdenregistratie, gecertificeerde trucknavigatie of garantie van vrije plekken.
+## APK
+Open de pagina **Releases → TruckSpot Europe V8** en download `TruckSpot-Europe-V8-Standalone.apk`.
 
-## APK downloaden
-Open **Releases** en kies `TruckSpot-Europe.apk`. Dit is een direct te installeren test-APK.
+## GPS en veiligheid
+- GPS-toestemming alleen tijdens het gebruik van de app.
+- Locatiegebruik is optioneel.
+- Google Maps en Street View worden extern geopend.
+- Kaarttegels van OpenStreetMap en parkeerinformatie van Overpass hebben internet nodig.
+- Bezettingsmeldingen en favorieten staan voorlopig alleen lokaal op het eigen toestel. Er zijn **geen gedeelde livebezettingsmeldingen**.
+- Afstanden zijn hemelsbreed, geen vrachtwagenrouteberekeningen.
+- Gratis testapp, geen officiële navigatie of tachograafoplossing.
 
-## Opmerking over updates
-Elke APK die met GitHub Actions als **debug APK** wordt gebouwd kan met een andere debugsignatuur worden ondertekend. Bij een melding dat een update niet geïnstalleerd kan worden, verwijder de oude testversie en installeer opnieuw. Maak voor brede verspreiding een stabiel ondertekende releasebuild.
+## Bouwproces
+GitHub Actions haalt uitsluitend bij de **eerste V8-build** een snapshot van de bestaande Netlify-V7-bron en van Leaflet op, past deze aan voor Android en slaat de bronbestanden op in deze repository. De gebouwde app gebruikt Netlify daarna niet voor de gebruikersinterface. Bij latere builds staan de appbestanden in GitHub.
 
-## Publicatie en licenties
-OpenStreetMap-data vereisen bronvermelding. OSM-tiles en publieke Overpass-servers zijn niet geschikt voor onbeperkte aantallen gebruikers; voor publieke release is geschikte kaart-/datacapaciteit nodig. De broncode van deze repository staat openbaar. Geen wachtwoorden, API-sleutels of persoonsgegevens erin opslaan.
+## Belangrijk
+Er is nog geen productiebackend, privacyverklaring of gegarandeerd beschikbare pan-Europese parkeerdata. Deze debug APK is **niet** klaar voor publicatie in Google Play. Het oude project Transport Uren is niet gewijzigd.

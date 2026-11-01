@@ -1,11 +1,9 @@
-name: Build TruckSpot Android APK
+name: Build TruckSpot Standalone APK V8
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths-ignore:
-      - 'app/src/main/assets/**'
 
 permissions:
   contents: write
@@ -14,83 +12,97 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     steps:
-      - name: Source ophalen
+      - name: Broncode ophalen
         uses: actions/checkout@v4
       - name: Java installeren
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - name: Android SDK installeren
+      - name: Android SDK 35 installeren
         shell: bash
         run: |
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)
           test -n "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses > /dev/null || true
           "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
-      - name: Ingebouwde TruckSpot-app voorbereiden
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -s app/src/main/assets/index.html
-          mkdir -p app/src/main/assets/vendor/images
-          if [ ! -s app/src/main/assets/vendor/leaflet.js ]; then
-            echo "Kaartbibliotheek in APK opnemen waar beschikbaar"
-            if curl -fLsS --max-time 30 --retry 2 "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" -o app/src/main/assets/vendor/leaflet.js && \
-               curl -fLsS --max-time 30 --retry 2 "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" -o app/src/main/assets/vendor/leaflet.css; then
-              for img in marker-icon.png marker-icon-2x.png marker-shadow.png; do
-                curl -fLsS --max-time 30 --retry 2 "https://unpkg.com/leaflet@1.9.4/dist/images/$img" -o "app/src/main/assets/vendor/images/$img" || true
-              done
-              python3 - <<'PY'
-          from pathlib import Path
-          p=Path('app/src/main/assets/index.html')
-          s=p.read_text(encoding='utf-8')
-          s=s.replace('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', './vendor/leaflet.js')
-          s=s.replace('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', './vendor/leaflet.css')
-          p.write_text(s,encoding='utf-8')
-          PY
-            else
-              echo "::warning::Kaartbibliotheek blijft via externe CDN geladen; Netlify wordt niet gebruikt."
-              rm -rf app/src/main/assets/vendor
-            fi
-          fi
-      - name: Kaartbibliotheek voor volgende builds bewaren
-        shell: bash
-        run: |
-          git config user.name 'truckspot-build-bot'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add app/src/main/assets
-          if ! git diff --cached --quiet; then
-            git commit -m "Bundle Leaflet and standalone TruckSpot UI [skip ci]"
-            git push origin HEAD:main
-          fi
-      - name: Gradle 8.9
+      - name: Gradle installeren
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Zelfstandige APK bouwen
+      - name: V8-schermen en kaartbibliotheek inbouwen
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets/web/{icons,vendor} app/src/main/res/drawable
+          if [ ! -s app/src/main/assets/web/index.html ]; then
+            echo "V7-bron eenmalig opslaan in de APK en GitHub."
+            curl --fail --location --retry 3 --connect-timeout 15 \
+              'https://inspiring-melba-a85bfd.netlify.app/' \
+              --output app/src/main/assets/web/index.html
+            curl --fail --location --retry 3 --connect-timeout 15 \
+              'https://inspiring-melba-a85bfd.netlify.app/icons/icon-192.png' \
+              --output app/src/main/assets/web/icons/icon-192.png
+            curl --fail --location --retry 3 --connect-timeout 15 \
+              'https://inspiring-melba-a85bfd.netlify.app/icons/icon-512.png' \
+              --output app/src/main/assets/web/icons/icon-512.png
+            curl --fail --location --retry 3 \
+              'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js' \
+              --output app/src/main/assets/web/vendor/leaflet.js
+            curl --fail --location --retry 3 \
+              'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css' \
+              --output app/src/main/assets/web/vendor/leaflet.css
+            python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/assets/web/index.html')
+          s=p.read_text(encoding='utf-8')
+          assert 'TruckSpot' in s and 'navigator.geolocation' in s and 'Leaflet' in s or 'leaflet.js' in s
+          s=s.replace('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css','./vendor/leaflet.css')
+          s=s.replace('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js','./vendor/leaflet.js')
+          s=s.replace('window.open(', 'window.location.assign(')
+          s=s.replace('V7 • GPS + PARKINGS','V8 • STANDALONE')
+          s=s.replace('V7 | GPS + parkeerplaatsen','V8 | Android standalone')
+          import re
+          s=re.sub(r"if\('serviceWorker' in navigator && window.isSecureContext\)\{\s*window.addEventListener\('load',\(\)=>navigator.serviceWorker.register\('\./sw\.js'\).*?\);\s*\}", '', s, flags=re.S)
+          p.write_text(s,encoding='utf-8')
+          PY
+            cp app/src/main/assets/web/icons/icon-192.png app/src/main/res/drawable/truckspot_branded_icon.png
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add app/src/main/assets/web app/src/main/res/drawable/truckspot_branded_icon.png
+            git commit -m "Snapshot V8 standalone app resources" || true
+            git push origin HEAD:main || true
+          fi
+          test -s app/src/main/assets/web/index.html
+          test -s app/src/main/assets/web/vendor/leaflet.js
+          test -s app/src/main/res/drawable/truckspot_branded_icon.png
+          grep -q './vendor/leaflet.js' app/src/main/assets/web/index.html
+          grep -q 'navigator.geolocation' app/src/main/assets/web/index.html
+          echo "TruckSpot-schermen worden nu uit de APK geladen (zonder Netlify)."
+      - name: APK compileren
         run: gradle --no-daemon --stacktrace :app:assembleDebug
-      - name: APK artifact bewaren
+      - name: APK aan GitHub Actions toevoegen
         uses: actions/upload-artifact@v4
         with:
-          name: TruckSpot-Europe-Android-Standalone
+          name: TruckSpot-Europe-V8-Standalone
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-      - name: Directe APK
+      - name: Directe APK-download
         shell: bash
-        run: cp app/build/outputs/apk/debug/app-debug.apk TruckSpot-Europe.apk
-      - name: Nieuwe APK publiceren op GitHub Releases
+        run: cp app/build/outputs/apk/debug/app-debug.apk TruckSpot-Europe-V8-Standalone.apk
+      - name: GitHub Release publiceren
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: test-apk
-          name: TruckSpot Europe - Zelfstandige Android testversie
+          tag_name: v8-standalone-test
+          name: TruckSpot Europe V8 - Standalone Android
           body: |
-            Zelfstandige APK: TruckSpot-schermen en logo zijn ingebouwd.
-            GPS werkt met Android-locatietoestemming, de kaart vereist internet.
-            Parkeerbezetting is nog geen gedeelde realtime informatie.
-            Dit is een testversie, niet geschikt als gecertificeerde vrachtwagennavigatie.
+            V8-testversie. Het TruckSpot-scherm, logo en kaartbibliotheek
+            zitten in de APK. Netlify is niet meer nodig om de app te starten.
+            Internet is wel nodig voor kaarttegels en actuele parkeerlocaties.
+            Dit is geen gecertificeerde vrachtwagennavigatie.
+            V7 testmeldingen blijven lokaal; er is geen gedeelde livebezetting.
           prerelease: true
           make_latest: false
-          files: TruckSpot-Europe.apk
+          files: TruckSpot-Europe-V8-Standalone.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
