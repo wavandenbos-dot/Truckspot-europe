@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090e0c"><title>TruckSpot Europe · V8 | Android standalone</title>
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090e0c"><title>TruckSpot Europe · V9 | GPS en parkeerdata</title>
 <link rel="stylesheet" href="./vendor/leaflet.css" crossorigin="anonymous">
 <style>
 :root{color-scheme:dark;--bg:#080d0b;--panel:#121c17;--panel2:#18251d;--lime:#71f42a;--lime2:#b7ffa0;--edge:#304335;--muted:#9baf9f;--text:#f2f9f2;--orange:#ffbd3a;--red:#ff6666}
@@ -36,8 +36,8 @@ body.map-open{overflow:hidden}
 <div class="controls"><select id="region" aria-label="Kies een stad in Europa"><option value="">🌍 Kies een regio</option></select><input id="search" aria-label="Zoek in de geladen parkeerlocaties" placeholder="🔎 Zoek in geladen locaties"></div>
 <div class="toolbar"><button class="btn primary" id="load">🅿️ Laad echte locaties</button><button type="button" class="btn primary" id="gps">📍 Vind mij met GPS</button><button type="button" class="btn" id="follow" aria-pressed="false">▶ Volg mij: uit</button><button type="button" class="btn" id="nearby">🅿️ Zoek bij mij</button><button class="btn" id="googlemap">🌍 Google Maps ↗</button><button class="btn" id="filters">⚙ Filters</button><button class="btn" id="time">⏱️ Rijtijd</button></div>
 <div class="gps-panel"><div id="gpsstatus" role="status" aria-live="polite">📍 GPS uit · je locatie wordt pas gevraagd als je op de knop tikt.</div><label for="radius">Toon parkeerplaatsen binnen <select id="radius" aria-label="Maximale afstand hemelsbreed"><option value="10">10 km</option><option value="25" selected>25 km</option><option value="50">50 km</option><option value="0">Alle geladen</option></select></label></div>
-<div class="mapbox" id="mapbox"><button class="map-expander" id="mapexpand" type="button" aria-pressed="false">⛶ Kaart vergroten</button><div id="map" class="map" aria-label="Interactieve kaart"></div><div id="mapstatus" role="status" class="status-pill">Zoom in op een regio en druk op 'Laad'</div><div class="source">© OpenStreetMap-bijdragers · data via Overpass • Google Maps opent apart</div></div>
-<div class="credit">GPS werkt het betrouwbaarst als je de app via een beveiligde HTTPS-website opent en locatie toestaat. Kaart en parkeerdata vereisen internet. Laden gebeurt voor een beperkt kaartgebied. Trucktoegang, voorzieningen en tarieven kunnen ontbreken of verouderd zijn.</div></section>
+<div class="mapbox" id="mapbox"><button class="map-expander" id="mapexpand" type="button" aria-pressed="false">⛶ Kaart vergroten</button><div id="map" class="map" aria-label="Interactieve kaart"></div><div id="mapstatus" role="status" class="status-pill">Zoom in op een regio en druk op 'Laad'</div><div class="source">© OpenStreetMap-bijdragers · parkeerdata via openbare Overpass-servers • Google Maps opent apart</div></div>
+<div class="credit">GPS werkt na toestemming in deze Android-app. Kaart en parkeerdata vereisen internet. Laden gebeurt voor een beperkt kaartgebied. Trucktoegang, voorzieningen en tarieven kunnen ontbreken of verouderd zijn.</div></section>
 <section class="right" aria-label="Resultaten"><div class="right-head"><div><h1>🚛 Parkeerplaatsen <span style="color:var(--lime)">in jouw kaartgebied</span></h1><p id="subheading">Nog geen locaties geladen</p></div><div class="counter" id="counter">0</div></div>
 <div class="toolbar" style="margin-top:4px"><button class="btn small" id="sort">↕ Dichtstbij</button><button class="btn small" id="clear">Wis filters</button><button class="btn small" id="help">ℹ Uitleg</button></div>
 <div class="callout" id="filterinfo">🌍 TruckSpot werkt door heel Europa waar OpenStreetMap parkeerinformatie bevat. <strong>Dit is nog geen live bezettingsdienst.</strong></div><div class="cards" id="spots"><div class="empty">Selecteer bijvoorbeeld Rotterdam, Dortmund of Parijs en druk op <b>Laad echte locaties</b>.</div></div>
@@ -107,13 +107,65 @@ function toggleBigMap(){
 function navigation(id){let s=getSpot(id);if(!s)return;let url=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${s.lat},${s.lng}`)}`;if(confirm('Open de locatie in Google Maps?\n\nDe locatie komt uit OpenStreetMap en is niet geverifieerd op vrachtwagentoegang. Google Maps is geen gegarandeerde vrachtwagennavigatie.'))window.location.assign(url,'_blank','noopener,noreferrer')}
 function bboxKey(){let b=state.map.getBounds();const round=n=>Math.round(n*100)/100;return [round(b.getSouth()),round(b.getWest()),round(b.getNorth()),round(b.getEast())].join(',')}
 function qFor(b){let bb=`(${b.getSouth().toFixed(5)},${b.getWest().toFixed(5)},${b.getNorth().toFixed(5)},${b.getEast().toFixed(5)})`;return `[out:json][timeout:22];(nwr["amenity"="parking"]["hgv"~"^(yes|designated|official)$"]${bb};nwr["amenity"="parking"]["capacity:hgv"]${bb};nwr["amenity"="parking"]["name"~"(truck|lkw|autohof|camion|vrachtwagen|camiones)",i]${bb};nwr["highway"~"^(rest_area|services)$"]${bb};);out center tags ${MAX_RESULTS};`}
-async function fetchLocations(){if(state.pending)return;const b=state.map.getBounds(),height=distance({lat:b.getSouth(),lng:b.getWest()},{lat:b.getNorth(),lng:b.getWest()}),width=distance({lat:b.getSouth(),lng:b.getWest()},{lat:b.getSouth(),lng:b.getEast()});if(height>85||width>110){tell('Zoom verder in: maximaal ongeveer 85 × 110 km per keer.');$('#mapstatus').textContent='⚠ Zoom verder in voordat je laadt';return}
-const key=bboxKey(),cached=store.get('ts3_cache_'+key,null);if(cached&&Date.now()-cached.at<CACHE_MS){state.data=cached.items;state.filterView='all';draw();$('#mapstatus').textContent=`✓ ${state.data.length} locaties uit cache`;tell('Eerder opgehaalde OpenStreetMap-data geladen');return}
-if(Date.now()-state.lastFetch<20000){tell('Om de openbare dataserver te ontzien: probeer over enkele seconden opnieuw.');return}
-state.pending=true;state.lastFetch=Date.now();$('#load').disabled=true;$('#load').textContent='⏳ Laden…';$('#mapstatus').textContent='OpenStreetMap-gegevens ophalen…';
-try{let controller=new AbortController();let timer=setTimeout(()=>controller.abort(),30000);let res;try{res=await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({data:qFor(b)}),signal:controller.signal})}finally{clearTimeout(timer)}
-if(!res.ok)throw Error('serverstatus '+res.status);let json=await res.json();if(!Array.isArray(json.elements))throw Error('ongeldig antwoord');let map=new Map;for(let e of json.elements){let s=sourceParking(e);if(s)map.set(s.id,s)}state.data=[...map.values()].slice(0,MAX_RESULTS);store.set('ts3_cache_'+key,{at:Date.now(),items:state.data});state.filterView='all';draw();$('#mapstatus').textContent=`✓ ${state.data.length} bronlocaties geladen${json.elements.length>=MAX_RESULTS?' (mogelijk niet volledig)':''}`;tell(state.data.length?'Echte locaties geladen – bezetting nog onbekend':'Geen passende OSM-locaties in deze regio gevonden');}
-catch(e){$('#mapstatus').textContent='⚠ Laden mislukt — probeer later of kies andere regio';tell('De openbare dataserver reageert niet. Probeer later opnieuw.');console.warn('Overpass fetch issue:',e)}finally{state.pending=false;$('#load').disabled=false;$('#load').textContent='🅿️ Laad echte locaties'}}
+
+function fromOsm(json) {
+  if(!Array.isArray(json?.elements)) throw Error("Ongeldig antwoord van parkeerdataserver");
+  const seen=new Map();
+  for(const element of json.elements) {
+    const spot=sourceParking(element);
+    if(spot) seen.set(spot.id,spot);
+  }
+  return [...seen.values()].slice(0,MAX_RESULTS);
+}
+function showParkingResults(spots, label) {
+  state.data=spots;
+  state.filterView='all';
+  state.query='';
+  $('#search').value='';
+  for(const f of Object.keys(state.filter)) state.filter[f]=false;
+  draw();
+  $('#mapstatus').textContent='✓ '+spots.length+' parkeerlocaties gevonden '+label+' · bezetting onbekend';
+  tell(spots.length?spots.length+' parkeerplaatsen gevonden':'Geen parkeerplaatsen met geschikte brongegevens gevonden. Probeer 50 km.');
+}
+async function parkingApi(path,timeoutMs=70000) {
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+  try {
+    const response=await fetch(path,{signal:ctrl.signal,cache:'no-store'});
+    if(!response.ok) {
+      let error='HTTP '+response.status;
+      try {const value=await response.json();error=value.error||error}catch{}
+      throw Error(error);
+    }
+    return fromOsm(await response.json());
+  } finally {clearTimeout(timer)}
+}
+async function fetchLocations(){
+  if(state.pending||!state.map)return;
+  if(!navigator.onLine){$('#mapstatus').textContent='⚠ Internet nodig voor parkeerplaatsen';return}
+  const bounds=state.map.getBounds();
+  const height=distance({lat:bounds.getSouth(),lng:bounds.getWest()},{lat:bounds.getNorth(),lng:bounds.getWest()});
+  const width=distance({lat:bounds.getSouth(),lng:bounds.getWest()},{lat:bounds.getSouth(),lng:bounds.getEast()});
+  if(height>85||width>110){$('#mapstatus').textContent='⚠ Zoom verder in voordat je laadt (maximaal ±85×110 km)';return}
+  const key='ts9_bbox_'+bboxKey();
+  const cached=store.get(key,null);
+  if(cached&&Date.now()-cached.at<CACHE_MS){
+    showParkingResults(cached.items,'uit cache');return;
+  }
+  if(Date.now()-state.lastFetch<15000){tell('Probeer over enkele seconden opnieuw om de gegevensdienst te ontzien.');return}
+  state.pending=true;state.lastFetch=Date.now();$('#load').disabled=true;
+  $('#mapstatus').textContent='⏳ Echte vrachtwagenparkings ophalen…';
+  try {
+    const b=[bounds.getSouth(),bounds.getWest(),bounds.getNorth(),bounds.getEast()].map(v=>v.toFixed(5)).join(',');
+    const spots=await parkingApi('/api/parking?bbox='+encodeURIComponent(b));
+    if(spots.length)store.set(key,{at:Date.now(),items:spots});
+    showParkingResults(spots,'op de kaart');
+  } catch(e) {
+    $('#mapstatus').textContent='⚠ Parkeerdata niet geladen: '+String(e.message||'netwerkfout');
+    tell('Zoeken mislukt. Controleer internet en probeer later nogmaals.');
+    console.warn('Overpass proxy lookup:',e);
+  } finally {state.pending=false;$('#load').disabled=false;$('#load').textContent='🅿️ Laad echte locaties'}
+}
 function init(){if(!window.L){$('#mapstatus').textContent='Kaartbibliotheek kan niet laden — internet nodig';$('#load').disabled=true;return}state.map=L.map('map',{scrollWheelZoom:false}).setView([51.4,6.15],9);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>-bijdragers',maxZoom:18}).addTo(state.map);state.markers=L.layerGroup().addTo(state.map);state.map.on('moveend',()=>{if(!state.pending){$('#mapstatus').textContent='↻ Kaart verplaatst — klik Laad voor deze regio'}});draw()}
 $('#region').addEventListener('change',e=>{if(e.target.value==='')return;const c=CITIES[+e.target.value];state.map?.setView([c[1],c[2]],11);tell(`Regio ingesteld op ${c[0]}. Druk op Laad.`)});
 $('#googlemap').addEventListener('click',googleCurrentMap);$('#mapexpand').addEventListener('click',toggleBigMap);
@@ -147,11 +199,31 @@ function gpsCheck(){
  if(!state.map){gpsStatus('⚠ Kaart kan niet laden. Controleer internet.',true);return false}
  return true
 }
-function loadNearMe(){if(!state.location){requestGps(true);return}if(!state.map)return;
-  const zoom=state.radiusKm===10?12:11;
-  state.map.setView([state.location.lat,state.location.lng],zoom);
-  $('#mapstatus').textContent='📍 Parkeerplaatsen bij GPS zoeken…';
-  window.setTimeout(()=>fetchLocations(),220);
+
+async function loadNearMe(){
+  if(!state.location){requestGps(true);return}
+  if(!state.map||state.pending)return;
+  if(!navigator.onLine){$('#mapstatus').textContent='⚠ Internet nodig voor parkeerdata';return}
+  const loc=state.location;
+  const km=(state.radiusKm===10||state.radiusKm===25||state.radiusKm===50)?state.radiusKm:50;
+  const zoom=km===10?12:km===25?11:10;
+  state.map.setView([loc.lat,loc.lng],zoom);
+  const key='ts9_gps_'+loc.lat.toFixed(2)+'_'+loc.lng.toFixed(2)+'_'+km;
+  const cached=store.get(key,null);
+  if(cached&&Date.now()-cached.at<CACHE_MS){showParkingResults(cached.items,'binnen '+km+' km uit cache');return}
+  if(Date.now()-state.lastFetch<15000){tell('Wacht enkele seconden tussen zoekopdrachten.');return}
+  state.pending=true;state.lastFetch=Date.now();$('#nearby').disabled=true;
+  $('#mapstatus').textContent='⏳ Parkeerplaatsen binnen '+km+' km van jouw GPS ophalen…';
+  try{
+    const url='/api/parking?lat='+loc.lat.toFixed(5)+'&lon='+loc.lng.toFixed(5)+'&radius='+km;
+    const spots=await parkingApi(url);
+    if(spots.length)store.set(key,{at:Date.now(),items:spots});
+    showParkingResults(spots,'binnen '+km+' km');
+  }catch(e){
+    $('#mapstatus').textContent='⚠ GPS werkt, maar parkeerdata ophalen lukt niet: '+String(e.message||'netwerkfout');
+    tell('GPS gevonden, parkeerdata niet beschikbaar.');
+    console.warn('GPS parking query:',e);
+  }finally{state.pending=false;$('#nearby').disabled=false}
 }
 function requestGps(loadAfter=false){if(!gpsCheck()||state.gpsBusy)return;
  state.gpsBusy=true;$('#gps').disabled=true;$('#gps').textContent='⌛ GPS zoeken…';gpsStatus('📍 Locatie opvragen… geef toestemming in Chrome.');

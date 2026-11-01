@@ -1,4 +1,4 @@
-name: Build TruckSpot Standalone APK V8
+name: Build TruckSpot Standalone APK V9
 
 on:
   workflow_dispatch:
@@ -30,7 +30,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Ingebouwde V8-kaart en icoon gereedmaken
+      - name: Ingebouwde V9-kaart en icoon gereedmaken
         shell: bash
         run: |
           set -euo pipefail
@@ -74,24 +74,24 @@ jobs:
       - name: APK als Artifact bewaren
         uses: actions/upload-artifact@v4
         with:
-          name: TruckSpot-Europe-V8-Standalone
+          name: TruckSpot-Europe-V9-GPS-Parkings
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Directe download maken
-        run: cp app/build/outputs/apk/debug/app-debug.apk TruckSpot-Europe-V8-Standalone.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk TruckSpot-Europe-V9-GPS-Parkings.apk
       - name: APK publiceren als GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v8-standalone-test
-          name: TruckSpot Europe V8 - Standalone Android
+          tag_name: v9-parking-gps-test
+          name: TruckSpot Europe V9 - Standalone Android
           body: |
-            TruckSpot V8-testapp met UI en logo ingebouwd in de APK.
+            TruckSpot V9-testapp met UI en logo ingebouwd in de APK.
             De APK opent niet langer de Netlify-website.
             Internet blijft nodig voor OpenStreetMap-kaarten en parkeergegevens.
             GPS werkt na toestemming en is niet gekoppeld aan een tachograaf.
             Parkeermeldingen blijven voorlopig alleen lokaal zichtbaar.
           prerelease: true
           make_latest: false
-          files: TruckSpot-Europe-V8-Standalone.apk
+          files: TruckSpot-Europe-V9-GPS-Parkings.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

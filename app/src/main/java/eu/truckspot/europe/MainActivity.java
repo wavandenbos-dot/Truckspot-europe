@@ -19,6 +19,13 @@ import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
@@ -55,7 +62,10 @@ public final class MainActivity extends Activity {
 
         webView.setWebViewClient(new WebViewClient() {
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
-                return embeddedAsset(req.getUrl());
+                Uri uri = req.getUrl();
+                if (isInternal(uri) && "/api/parking".equals(uri.getPath()))
+                    return searchParking(uri);
+                return embeddedAsset(uri);
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (!request.isForMainFrame()) return false;
@@ -106,6 +116,107 @@ public final class MainActivity extends Activity {
         pendingOrigin = null;
         if (!allowed) Toast.makeText(this, "GPS niet toegestaan. Je kunt handmatig zoeken.", Toast.LENGTH_LONG).show();
     }
+
+    /**
+     * Small, same-origin bridge from the APK's trusted UI to public Overpass services.
+     * It avoids Chrome CORS problems. Coordinates are sent only after the driver
+     * explicitly presses Search/GPS. No personal position is saved here.
+     */
+    private WebResourceResponse searchParking(Uri request) {
+        String area;
+        try {
+            String bbox = request.getQueryParameter("bbox");
+            if (bbox != null) {
+                String[] parts = bbox.split(",");
+                if (parts.length != 4) return errorJson(400, "Ongeldig kaartgebied");
+                double[] b = new double[4];
+                for (int i=0; i<4; i++) b[i] = Double.parseDouble(parts[i]);
+                if (!validLat(b[0]) || !validLat(b[2]) ||
+                    !validLon(b[1]) || !validLon(b[3]) ||
+                    b[0] >= b[2] || b[1] >= b[3] ||
+                    b[2]-b[0] > 2 || b[3]-b[1] > 3)
+                    return errorJson(400, "Zoom verder in op de kaart");
+                area = "(" + fmt(b[0]) + "," + fmt(b[1]) + ","
+                        + fmt(b[2]) + "," + fmt(b[3]) + ")";
+            } else {
+                double lat = Double.parseDouble(request.getQueryParameter("lat"));
+                double lon = Double.parseDouble(request.getQueryParameter("lon"));
+                double radius = Double.parseDouble(request.getQueryParameter("radius"));
+                if (!validLat(lat) || !validLon(lon) || !Double.isFinite(radius) ||
+                    radius < 1 || radius > 50)
+                    return errorJson(400, "Ongeldige GPS-zoekopdracht");
+                area = "(around:" + Math.round(radius*1000) + ","
+                        + fmt(lat) + "," + fmt(lon) + ")";
+            }
+        } catch (Exception e) {
+            return errorJson(400, "GPS of kaartgegevens ontbreken");
+        }
+
+        String query = "[out:json][timeout:25];("
+                + "nwr[\"amenity\"=\"parking\"][\"hgv\"~\"^(yes|designated|official)$\"]" + area + ";"
+                + "nwr[\"amenity\"=\"parking\"][\"capacity:hgv\"]" + area + ";"
+                + "nwr[\"amenity\"=\"parking\"][\"name\"~\"(truck|lkw|autohof|camion|vrachtwagen|camiones)\",i]" + area + ";"
+                + "nwr[\"highway\"~\"^(rest_area|services)$\"]" + area + ";"
+                + ");out center tags 350;";
+        String[] servers = {
+            "https://overpass.private.coffee/api/interpreter",
+            "https://overpass-api.de/api/interpreter"
+        };
+        for (String endpoint:servers) {
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection)new URL(endpoint).openConnection();
+                connection.setRequestMethod("POST");
+                connection.setConnectTimeout(9000);
+                connection.setReadTimeout(26000);
+                connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+                connection.setRequestProperty("Accept", "application/json");
+                connection.setRequestProperty("User-Agent", "TruckSpot-Europe-Android-Test/0.10");
+                connection.setDoOutput(true);
+                byte[] payload = ("data=" + URLEncoder.encode(query, "UTF-8"))
+                        .getBytes(StandardCharsets.UTF_8);
+                try (OutputStream out = connection.getOutputStream()) {
+                    out.write(payload);
+                }
+                if (connection.getResponseCode() != 200) continue;
+                byte[] body;
+                try (InputStream in = connection.getInputStream()) {
+                    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                    byte[] chunk = new byte[8192];
+                    int n;
+                    while ((n = in.read(chunk)) != -1) {
+                        bytes.write(chunk, 0, n);
+                        if (bytes.size() > 3000000) throw new IOException("Too much data");
+                    }
+                    body = bytes.toByteArray();
+                }
+                String result = new String(body, StandardCharsets.UTF_8);
+                if (!result.trim().startsWith("{") || !result.contains("\"elements\"")) continue;
+                Map<String,String> headers = new HashMap<>();
+                headers.put("Cache-Control", "no-store");
+                headers.put("X-Content-Type-Options", "nosniff");
+                return new WebResourceResponse("application/json", "UTF-8", 200, "OK",
+                       headers, new ByteArrayInputStream(body));
+            } catch (IOException ignored) {
+                // Public servers may be busy. Try the next server once.
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        }
+        return errorJson(503, "Parkeerdata tijdelijk niet bereikbaar. Probeer later opnieuw.");
+    }
+    private String fmt(double value) {
+        return String.format(Locale.US, "%.5f", value);
+    }
+    private boolean validLat(double v) { return Double.isFinite(v) && v >= -90 && v <= 90; }
+    private boolean validLon(double v) { return Double.isFinite(v) && v >= -180 && v <= 180; }
+    private WebResourceResponse errorJson(int status, String message) {
+        byte[] body = ("{\"error\":\"" + message + "\"}").getBytes(StandardCharsets.UTF_8);
+        return new WebResourceResponse("application/json", "UTF-8", status,
+            status==400 ? "Bad Request" : "Service Unavailable",
+            new HashMap<>(), new ByteArrayInputStream(body));
+    }
+
     private WebResourceResponse embeddedAsset(Uri uri) {
         if (!isInternal(uri)) return null;
         String path = uri.getPath();
