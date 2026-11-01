@@ -44,3 +44,9 @@ RLS verleent chauffeurs geen update-rechten; ze kunnen hun eigen inzending dus n
 - Geen live bezetting of gecertificeerde trucknavigatie.
 - V14 lokaal toegevoegde plekken komen niet vanzelf naar een nieuwe test-app (ander app-ID). Bewaar V14 voorlopig.
 - Publicatie voor veel gebruikers vereist extra privacy-, moderatie-, data-licentie- en beveiligingstests.
+
+
+## Project aangemaakt en gekoppeld (2026-11-01)
+Supabase project ref: `xlwqcgoljamieofhsyrs`, regio `eu-central-1`, naam **TruckSpot Europe**. De migration `truckspot_shared_parking_moderated` is uitgevoerd; beveiligingsadvisors gaven bij de eerste controle geen meldingen. De V16-app heeft URL en publiceerbare sleutel opgenomen; beheersleutels staan nergens in de repository.
+
+**Nog nodig via dashboard:** Enable Anonymous Sign-Ins onder Authentication → Providers en controleer anti-spam instellingen voordat externe chauffeurs gaan insturen.

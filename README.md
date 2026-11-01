@@ -41,3 +41,7 @@ Knop **➕ Parkeerplaats toevoegen** boven de lijst. Je kunt GPS of kaartmidden 
 
 ### V15 gedeelde parkeerplaatsen (voorbereid, alleen actief met Supabase)
 V15 biedt een overzicht van goedgekeurde gedeelde plekken, een refreshknop en een verzendknop bij je eigen lokale parkeerplaatsen. De Supabase-projectconfiguratie is momenteel leeg. Zonder verbonden Supabase-project worden geen locaties verzonden en blijven bestaande functies lokaal werken. Lees `docs/GEDEELDE_PARKINGEN.md` en koppel Supabase voor echte synchronisatie. V15 is vanwege de test-APK-ondertekening een aparte app en kan V14-lokale gegevens niet automatisch overnemen.
+
+
+### V16 — gedeelde Supabase-database verbonden
+Supabase-project `TruckSpot Europe` is aangemaakt in de EU-regio `eu-central-1`. De tabel `public.truckspot_parking_submissions` is actief, beveiligd met RLS; uitsluitend goedgekeurde inzendingen zijn openbaar. Ingebouwde onderzoeksparkings blijven offline beschikbaar. Project URL en **publishable** API-sleutel zijn opgenomen in de app-config (dit zijn publieke clientgegevens, geen beheersleutel). Controleer in Supabase → Authentication → Providers of **Anonymous Sign-Ins** aanstaat voordat je chauffeursinzendingen test. Ongecontroleerde locaties zijn nooit publiek. V16 heeft opnieuw een eigen Android-app-id voor installatie naast oudere testversies.

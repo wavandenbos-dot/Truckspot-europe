@@ -1,4 +1,4 @@
-name: Build TruckSpot Standalone APK V15-test
+name: Build TruckSpot Standalone APK V16-test
 
 on:
   workflow_dispatch:
@@ -30,7 +30,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Ingebouwde V15-test-kaart en icoon gereedmaken
+      - name: Ingebouwde V16-test-kaart en icoon gereedmaken
         shell: bash
         run: |
           set -euo pipefail
@@ -70,6 +70,13 @@ jobs:
           node --check /tmp/truckspot-inline.js
           node --check app/src/main/assets/web/own-parking.js
           node --check app/src/main/assets/web/shared-parking.js
+          python3 - <<'PY'
+          import json
+          p='app/src/main/assets/web/shared-config.json'
+          d=json.load(open(p))
+          assert d['url'].startswith('https://') and d['publishableKey'].startswith('sb_publishable_'), 'Supabase publishable config invalid'
+          print('Supabase public client configuration validated')
+          PY
           echo "TruckSpot UI is opgeslagen in de APK; Netlify is niet nodig."
       - name: Europees vrachtwagenparkeerbestand in de APK opnemen
         shell: bash
@@ -101,24 +108,24 @@ jobs:
       - name: APK als Artifact bewaren
         uses: actions/upload-artifact@v4
         with:
-          name: TruckSpot-Europe-V15-Test-Apart
+          name: TruckSpot-Europe-V16-Test-Apart
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Directe download maken
-        run: cp app/build/outputs/apk/debug/app-debug.apk TruckSpot-Europe-V15-Test-Apart.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk TruckSpot-Europe-V16-Test-Apart.apk
       - name: APK publiceren als GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v15-shared-parking-prep-test
-          name: TruckSpot Europe V15-test - Standalone Android
+          tag_name: v16-shared-database-connected
+          name: TruckSpot Europe V16-test - Standalone Android
           body: |
-            TruckSpot V15-test-testapp met UI en logo ingebouwd in de APK.
+            TruckSpot V16-test-testapp met UI en logo ingebouwd in de APK.
             De APK opent niet langer de Netlify-website.
             Internet blijft nodig voor OpenStreetMap-kaarten en parkeergegevens.
             GPS werkt na toestemming en is niet gekoppeld aan een tachograaf.
             Parkeermeldingen blijven voorlopig alleen lokaal zichtbaar.
           prerelease: true
           make_latest: false
-          files: TruckSpot-Europe-V15-Test-Apart.apk
+          files: TruckSpot-Europe-V16-Test-Apart.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
