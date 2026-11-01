@@ -1,0 +1,28 @@
+name: Verify European truck parking dataset
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/dataset-check.yml'
+permissions:
+  contents: read
+jobs:
+  data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download and inspect public truck parking CSV
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl --fail --retry 2 --retry-delay 2 --connect-timeout 10 --max-time 80 --location \
+            'https://zenodo.org/records/14643147/files/truckParkingLocationsEurope_N13323_v04.csv?download=1' \
+            -o /tmp/truck_parking.csv
+          wc -c /tmp/truck_parking.csv
+          sha256sum /tmp/truck_parking.csv
+          python3 - <<'PY'
+          import csv
+          with open('/tmp/truck_parking.csv', encoding='utf-8-sig', newline='') as f:
+              r=csv.DictReader(f)
+              print('COLUMNS:',r.fieldnames)
+              print('SAMPLES:',next(r),next(r))
+          PY
