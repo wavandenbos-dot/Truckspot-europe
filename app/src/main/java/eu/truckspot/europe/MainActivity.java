@@ -143,7 +143,7 @@ public final class MainActivity extends Activity {
                 double lon = Double.parseDouble(request.getQueryParameter("lon"));
                 double radius = Double.parseDouble(request.getQueryParameter("radius"));
                 if (!validLat(lat) || !validLon(lon) || !Double.isFinite(radius) ||
-                    radius < 1 || radius > 50)
+                    radius < 1 || radius > 100)
                     return errorJson(400, "Ongeldige GPS-zoekopdracht");
                 area = "(around:" + Math.round(radius*1000) + ","
                         + fmt(lat) + "," + fmt(lon) + ")";
@@ -155,8 +155,10 @@ public final class MainActivity extends Activity {
         String query = "[out:json][timeout:25];("
                 + "nwr[\"amenity\"=\"parking\"][\"hgv\"~\"^(yes|designated|official)$\"]" + area + ";"
                 + "nwr[\"amenity\"=\"parking\"][\"capacity:hgv\"]" + area + ";"
-                + "nwr[\"amenity\"=\"parking\"][\"name\"~\"(truck|lkw|autohof|camion|vrachtwagen|camiones)\",i]" + area + ";"
+                + "nwr[\"amenity\"=\"parking\"][\"name\"~\"(truck|lkw|autohof|camion|vrachtwagen|camiones|tir|rast|poids.lourds)\",i]" + area + ";"
                 + "nwr[\"highway\"~\"^(rest_area|services)$\"]" + area + ";"
+                + "nwr[\"amenity\"=\"truck_stop\"]" + area + ";"
+                + "nwr[\"parking\"=\"layby\"][\"hgv\"~\"^(yes|designated)$\"]" + area + ";"
                 + ");out center tags 350;";
         String[] servers = {
             "https://overpass.private.coffee/api/interpreter",
