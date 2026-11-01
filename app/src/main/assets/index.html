@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090e0c"><title>TruckSpot Europe · Standalone APK | GPS en parkeerplaatsen</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous">
+<link rel="stylesheet" href="./vendor/leaflet.css" crossorigin="anonymous">
 <style>
 :root{color-scheme:dark;--bg:#080d0b;--panel:#121c17;--panel2:#18251d;--lime:#71f42a;--lime2:#b7ffa0;--edge:#304335;--muted:#9baf9f;--text:#f2f9f2;--orange:#ffbd3a;--red:#ff6666}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}button,input,select{font:inherit}button{cursor:pointer}a{color:var(--lime2)}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--lime);outline-offset:2px}
@@ -43,7 +43,7 @@ body.map-open{overflow:hidden}
 <div class="callout" id="filterinfo">🌍 TruckSpot werkt door heel Europa waar OpenStreetMap parkeerinformatie bevat. <strong>Dit is nog geen live bezettingsdienst.</strong></div><div class="cards" id="spots"><div class="empty">Selecteer bijvoorbeeld Rotterdam, Dortmund of Parijs en druk op <b>Laad echte locaties</b>.</div></div>
 <div class="bottom-nav"><button class="btn selected" id="all">🗺️ Alle locaties</button><button class="btn" id="fav">♥ Favorieten <span id="favcount">0</span></button><button class="btn" id="report">＋ Melden</button></div></section></div>
 <div class="overlay" id="overlay" aria-hidden="true"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"><div class="sheet-head"><h2 id="sheet-title"></h2><button class="close" id="close" aria-label="Sluiten">×</button></div><div id="sheetbody"></div></div></div><div id="toast" class="toast" role="status"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+<script src="./vendor/leaflet.js" crossorigin="anonymous"></script>
 <script>
 'use strict';
 const $=s=>document.querySelector(s);
