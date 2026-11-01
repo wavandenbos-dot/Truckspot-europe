@@ -1,4 +1,4 @@
-name: Build TruckSpot Standalone APK V11-test
+name: Build TruckSpot Standalone APK V12-test
 
 on:
   workflow_dispatch:
@@ -30,7 +30,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Ingebouwde V11-test-kaart en icoon gereedmaken
+      - name: Ingebouwde V12-test-kaart en icoon gereedmaken
         shell: bash
         run: |
           set -euo pipefail
@@ -74,24 +74,24 @@ jobs:
       - name: APK als Artifact bewaren
         uses: actions/upload-artifact@v4
         with:
-          name: TruckSpot-Europe-V11-Test-Apart
+          name: TruckSpot-Europe-V12-Test-Apart
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Directe download maken
-        run: cp app/build/outputs/apk/debug/app-debug.apk TruckSpot-Europe-V11-Test-Apart.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk TruckSpot-Europe-V12-Test-Apart.apk
       - name: APK publiceren als GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v11-separate-install-test
-          name: TruckSpot Europe V11-test - Standalone Android
+          tag_name: v12-separate-install-test
+          name: TruckSpot Europe V12-test - Standalone Android
           body: |
-            TruckSpot V11-test-testapp met UI en logo ingebouwd in de APK.
+            TruckSpot V12-test-testapp met UI en logo ingebouwd in de APK.
             De APK opent niet langer de Netlify-website.
             Internet blijft nodig voor OpenStreetMap-kaarten en parkeergegevens.
             GPS werkt na toestemming en is niet gekoppeld aan een tachograaf.
             Parkeermeldingen blijven voorlopig alleen lokaal zichtbaar.
           prerelease: true
           make_latest: false
-          files: TruckSpot-Europe-V11-Test-Apart.apk
+          files: TruckSpot-Europe-V12-Test-Apart.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

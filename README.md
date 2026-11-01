@@ -19,3 +19,11 @@ GitHub Actions haalt uitsluitend bij de **eerste V8-build** een snapshot van de 
 
 ## Belangrijk
 Er is nog geen productiebackend, privacyverklaring of gegarandeerd beschikbare pan-Europese parkeerdata. Deze debug APK is **niet** klaar voor publicatie in Google Play. Het oude project Transport Uren is niet gewijzigd.
+
+
+### V12: 1 november 2026 — kaart en GPS
+- GPS-volgen gebruikt `panTo()` zonder het zoomniveau terug te zetten.
+- Handmatig zoomen of slepen stopt GPS-volgen, zodat je de kaart vrij kunt bekijken.
+- Na GPS-bepaling en bij de volgknop begint een parkeerzoekopdracht automatisch (één keer per sessie).
+- Fouten in de parkeerbron zijn ook zichtbaar in het overzicht bij het getal 0.
+- Android-testversie met eigen app-ID, naast eerdere testinstallaties.
