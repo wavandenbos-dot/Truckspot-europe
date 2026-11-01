@@ -27,3 +27,9 @@ Er is nog geen productiebackend, privacyverklaring of gegarandeerd beschikbare p
 - Na GPS-bepaling en bij de volgknop begint een parkeerzoekopdracht automatisch (één keer per sessie).
 - Fouten in de parkeerbron zijn ook zichtbaar in het overzicht bij het getal 0.
 - Android-testversie met eigen app-ID, naast eerdere testinstallaties.
+
+
+### TruckSpot V13 — betrouwbare Europese kaartlocaties (2025)
+Bij de APK-build wordt een dataset met 13.323 potentiële vrachtwagenparkeerlocaties uit Europa (Fraunhofer ISI, 2025) opgenomen in de APK. De locaties zijn offline doorzoekbaar, zodat een trage Overpass-server het opzoeken van **potentiële** truckstops niet langer blokkeert. Niet alle genoemde locaties zijn legaal/toegankelijk, op de exacte kaartspeld kan afwijking zitten. Controleer borden en toegangsregels. **Geen live vrijmeldingen.** Kaarttegels en aanvullende data vereisen nog internet.
+
+**Databron en auteursrecht:** Link, Steffen; Plötz, Patrick; Speth, Daniel; Gnann, Till (2025), *European Truck Parking Locations*, version v04, Fraunhofer ISI, doi:10.5281/zenodo.14643147, Creative Commons Attribution 4.0 (CC BY 4.0). We bewerken de CSV naar compact JSON. Bronbestand is 24 januari 2025. Bronlocaties zijn onderzoeksreferentiepunten, geen gecertificeerde vrachtwagenparkeergelegenheden.

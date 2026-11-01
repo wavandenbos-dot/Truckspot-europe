@@ -1,4 +1,4 @@
-name: Build TruckSpot Standalone APK V12-test
+name: Build TruckSpot Standalone APK V13-test
 
 on:
   workflow_dispatch:
@@ -30,7 +30,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Ingebouwde V12-test-kaart en icoon gereedmaken
+      - name: Ingebouwde V13-test-kaart en icoon gereedmaken
         shell: bash
         run: |
           set -euo pipefail
@@ -69,29 +69,54 @@ jobs:
           PY
           node --check /tmp/truckspot-inline.js
           echo "TruckSpot UI is opgeslagen in de APK; Netlify is niet nodig."
+      - name: Europees vrachtwagenparkeerbestand in de APK opnemen
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets/web/data
+          if [ ! -s app/src/main/assets/web/data/truckparkings.json ]; then
+            curl --fail --retry 2 --retry-delay 2 --connect-timeout 10 --max-time 90 --location \
+              'https://zenodo.org/records/14643147/files/truckParkingLocationsEurope_N13323_v04.csv?download=1' \
+              -o /tmp/truckParkingLocationsEurope_N13323_v04.csv
+            python3 scripts/build_parking_catalog.py \
+              /tmp/truckParkingLocationsEurope_N13323_v04.csv \
+              app/src/main/assets/web/data/truckparkings.json
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add app/src/main/assets/web/data/truckparkings.json
+            git commit -m "Snapshot Fraunhofer 2025 European truck parking coordinates (CC BY 4.0)" || true
+            git push origin HEAD:main || true
+          fi
+          python3 - <<'PY'
+          import json
+          p='app/src/main/assets/web/data/truckparkings.json'
+          d=json.load(open(p))
+          assert len(d['spots'])>=12000, "Parking data invalid or missing"
+          print('TRUCK_PARKING_DATASET:',len(d['spots']),'Europe locations embedded')
+          PY
       - name: APK compileren
         run: gradle --no-daemon --stacktrace :app:assembleDebug
       - name: APK als Artifact bewaren
         uses: actions/upload-artifact@v4
         with:
-          name: TruckSpot-Europe-V12-Test-Apart
+          name: TruckSpot-Europe-V13-Test-Apart
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Directe download maken
-        run: cp app/build/outputs/apk/debug/app-debug.apk TruckSpot-Europe-V12-Test-Apart.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk TruckSpot-Europe-V13-Test-Apart.apk
       - name: APK publiceren als GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v12-separate-install-test
-          name: TruckSpot Europe V12-test - Standalone Android
+          tag_name: v13-embedded-truckparking-test
+          name: TruckSpot Europe V13-test - Standalone Android
           body: |
-            TruckSpot V12-test-testapp met UI en logo ingebouwd in de APK.
+            TruckSpot V13-test-testapp met UI en logo ingebouwd in de APK.
             De APK opent niet langer de Netlify-website.
             Internet blijft nodig voor OpenStreetMap-kaarten en parkeergegevens.
             GPS werkt na toestemming en is niet gekoppeld aan een tachograaf.
             Parkeermeldingen blijven voorlopig alleen lokaal zichtbaar.
           prerelease: true
           make_latest: false
-          files: TruckSpot-Europe-V12-Test-Apart.apk
+          files: TruckSpot-Europe-V13-Test-Apart.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
