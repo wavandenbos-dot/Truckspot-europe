@@ -37,3 +37,7 @@ Bij de APK-build wordt een dataset met 13.323 potentiële vrachtwagenparkeerloca
 
 ### V14 — eigen parkeerplaatsen (lokale test)
 Knop **➕ Parkeerplaats toevoegen** boven de lijst. Je kunt GPS of kaartmidden gebruiken en de naam, tarief, type, toilet/douche/eten/beveiliging en notities invullen. De nieuwe plek verschijnt op de kaart als ✚ en in de lijst. In Details kun je hem weer verwijderen. De gegevens worden alleen op jouw telefoon bewaard onder `ts14_own_spots` en zijn niet gedeeld met andere chauffeurs; door appverwijdering kunnen ze verloren gaan. Deze zelfstandige V14-test-app heeft een aparte pakketnaam en importeert geen eerdere testgegevens.
+
+
+### V15 gedeelde parkeerplaatsen (voorbereid, alleen actief met Supabase)
+V15 biedt een overzicht van goedgekeurde gedeelde plekken, een refreshknop en een verzendknop bij je eigen lokale parkeerplaatsen. De Supabase-projectconfiguratie is momenteel leeg. Zonder verbonden Supabase-project worden geen locaties verzonden en blijven bestaande functies lokaal werken. Lees `docs/GEDEELDE_PARKINGEN.md` en koppel Supabase voor echte synchronisatie. V15 is vanwege de test-APK-ondertekening een aparte app en kan V14-lokale gegevens niet automatisch overnemen.
