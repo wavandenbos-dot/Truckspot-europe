@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   apk:
@@ -39,3 +39,21 @@ jobs:
           name: TruckSpot-Europe-Android-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Directe APK download maken
+        shell: bash
+        run: cp app/build/outputs/apk/debug/app-debug.apk TruckSpot-Europe.apk
+      - name: APK publiceren als GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: test-apk
+          name: TruckSpot Europe - Android testversie
+          body: |
+            Eerste Android test-app voor TruckSpot Europe.
+            Installeer alleen als je deze testversie vertrouwt.
+            De app gebruikt internet en opent de TruckSpot-website.
+            Dit is geen versie voor Google Play en geen gecertificeerde trucknavigatie.
+          prerelease: true
+          make_latest: false
+          files: TruckSpot-Europe.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
