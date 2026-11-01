@@ -1,26 +1,26 @@
 plugins {
     id 'com.android.application'
 }
+
 android {
     namespace 'eu.truckspot.europe'
     compileSdk 35
-
     defaultConfig {
         applicationId 'eu.truckspot.europe'
         minSdk 26
         targetSdk 35
-        versionCode 8
-        versionName '0.8.0-test'
+        versionCode 9
+        versionName '0.9.0-test'
     }
-
     buildTypes {
-        release {
-            minifyEnabled false
-        }
+        release { minifyEnabled false }
     }
-
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
 }

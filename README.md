@@ -1,29 +1,20 @@
-# 🚛 TruckSpot Europe — Android test-app
+# 🚛 TruckSpot Europe — zelfstandige Android-testapp
 
-Android-project voor de gratis TruckSpot Europe-parkeerapp.
+TruckSpot Europe is een gratis prototype voor vrachtwagenchauffeurs. De Android-app bevat nu zijn **eigen ingebouwde startscherm** (net als de Transport Uren-app). Hij verwijst **niet meer naar Netlify tijdens gebruik**.
 
-**Wat is dit?** Een Android WebView-app die de bestaande TruckSpot-website veilig via HTTPS opent:
-https://inspiring-melba-a85bfd.netlify.app/
+## Werking
+- Startscherm, kaartbediening, logo en zoekfilters zitten in de APK.
+- GPS gebruikt Android-locatietoestemming tijdens gebruik. App-locatie werkt via het beveiligde interne WebView-adres `https://appassets.androidplatform.net/assets/index.html`.
+- OpenStreetMap-kaarttegels, externe parkeerdata en Google Maps / Street View hebben wel internet nodig.
+- Parkeerplaatsen zijn externe gegevens met wisselende dekking; 'bezetting onbekend' betekent geen realtime informatie.
+- De eerste versie importeert de bestaande V7-broncode eenmalig vanuit de bestaande publieke testwebsite en bewaart hem vervolgens in deze repository. Daarna worden de lokale bestanden in volgende APK's gebruikt.
+- Android-app is een testbuild. Geen officiële rijtijdenregistratie, gecertificeerde trucknavigatie of garantie van vrije plekken.
 
-De app vraagt locatie-toestemming wanneer je GPS gebruikt en opent navigatie en Street View in een externe app. Je kunt de APK op je eigen Android installeren zonder via Chrome te openen.
+## APK downloaden
+Open **Releases** en kies `TruckSpot-Europe.apk`. Dit is een direct te installeren test-APK.
 
-## APK automatisch bouwen
+## Opmerking over updates
+Elke APK die met GitHub Actions als **debug APK** wordt gebouwd kan met een andere debugsignatuur worden ondertekend. Bij een melding dat een update niet geïnstalleerd kan worden, verwijder de oude testversie en installeer opnieuw. Maak voor brede verspreiding een stabiel ondertekende releasebuild.
 
-1. Open **Actions** in deze GitHub-repository.
-2. Open **Build TruckSpot Android APK**.
-3. Kies **Run workflow**. Ook elke push naar main start automatisch een build.
-4. Open na een groene build de workflow-run en download onder **Artifacts** het bestand `TruckSpot-Europe-Android-APK`.
-5. Pak de ZIP uit: daarin zit `app-debug.apk`. Open het bestand op Android en bevestig de installatie (alleen als je het bestand vertrouwt).
-
-Dit is een *test-APK* met een debug-handtekening, **geen** Play Store-release. Op een ander apparaat of na een wijziging van de ondertekeningssleutel kan opnieuw installeren nodig zijn.
-
-## Belangrijk
-
-- De inhoud wordt opgehaald vanaf de bestaande Netlify-website. De app heeft internet nodig. Werk de website via Netlify bij; de app toont daarna die bijgewerkte website.
-- GPS gebruikt de Android-toestemming **alleen tijdens gebruik**; geen achtergrondlocatie.
-- Beschikbaarheid van parkeerplaatsen is niet live bevestigd; meldingen blijven voorlopig lokale tests.
-- Niet gebruiken als officieel tachograaf-/rij- en rusttijdensysteem of gecertificeerde trucknavigatie.
-- Dit project bevat geen geheime sleutels, wachtwoorden of betaalgegevens.
-- Voor een Play Store-publicatie zijn extra tests, beleid, privacyverklaring en release-ondertekening nodig.
-
-Techniek: Android Gradle Plugin 8.7.3, Gradle 8.9, Java 17, Android SDK 35, minSdk 26.
+## Publicatie en licenties
+OpenStreetMap-data vereisen bronvermelding. OSM-tiles en publieke Overpass-servers zijn niet geschikt voor onbeperkte aantallen gebruikers; voor publieke release is geschikte kaart-/datacapaciteit nodig. De broncode van deze repository staat openbaar. Geen wachtwoorden, API-sleutels of persoonsgegevens erin opslaan.

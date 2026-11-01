@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    paths-ignore:
+      - 'app/src/main/assets/**'
 
 permissions:
   contents: write
@@ -14,44 +16,95 @@ jobs:
     steps:
       - name: Source ophalen
         uses: actions/checkout@v4
+
       - name: Java installeren
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - name: Android SDK 35 installeren
+
+      - name: Android SDK installeren
         shell: bash
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)
           test -n "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses > /dev/null || true
           "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: TruckSpot lokaal in de APK voorbereiden
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets/icons app/src/main/assets/vendor/images
+          if [ ! -s app/src/main/assets/index.html ]; then
+            echo "Eenmalig de bestaande TruckSpot V7-testsite importeren"
+            curl --fail --location --retry 3 --max-time 35 \
+              "https://inspiring-melba-a85bfd.netlify.app/" -o app/src/main/assets/index.html
+            test "$(wc -c < app/src/main/assets/index.html)" -gt 20000
+            grep -iq "TruckSpot" app/src/main/assets/index.html
+            curl -fLsS --retry 3 "https://inspiring-melba-a85bfd.netlify.app/manifest.webmanifest" -o app/src/main/assets/manifest.webmanifest
+            curl -fLsS --retry 3 "https://inspiring-melba-a85bfd.netlify.app/icons/icon-192.png" -o app/src/main/assets/icons/icon-192.png
+            curl -fLsS --retry 3 "https://inspiring-melba-a85bfd.netlify.app/icons/icon-512.png" -o app/src/main/assets/icons/icon-512.png
+          fi
+          if [ ! -s app/src/main/assets/vendor/leaflet.js ]; then
+            curl -fLsS --retry 3 "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" -o app/src/main/assets/vendor/leaflet.js
+            curl -fLsS --retry 3 "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" -o app/src/main/assets/vendor/leaflet.css
+            curl -fLsS --retry 3 "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" -o app/src/main/assets/vendor/images/marker-icon.png
+            curl -fLsS --retry 3 "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png" -o app/src/main/assets/vendor/images/marker-icon-2x.png
+            curl -fLsS --retry 3 "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png" -o app/src/main/assets/vendor/images/marker-shadow.png
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path("app/src/main/assets/index.html")
+          data=path.read_text(encoding="utf-8")
+          data=data.replace("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js","./vendor/leaflet.js")
+          data=data.replace("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css","./vendor/leaflet.css")
+          data=data.replace("if('serviceWorker' in navigator && window.isSecureContext)", "if(false && 'serviceWorker' in navigator && window.isSecureContext)")
+          path.write_text(data,encoding="utf-8")
+          PY
+          test -s app/src/main/assets/index.html
+          test -s app/src/main/assets/vendor/leaflet.js
+
+      - name: Eenmalig de webcode bewaren in GitHub
+        shell: bash
+        run: |
+          git config user.name "truckspot-build-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/assets
+          if ! git diff --cached --quiet; then
+            git commit -m "Add standalone TruckSpot assets bundled into Android APK [skip ci]"
+            git push origin HEAD:main
+          fi
+
       - name: Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Test-APK bouwen
+
+      - name: Android-APK bouwen
         run: gradle --no-daemon --stacktrace :app:assembleDebug
-      - name: APK beschikbaar maken
+
+      - name: APK als artifact bewaren
         uses: actions/upload-artifact@v4
         with:
-          name: TruckSpot-Europe-Android-APK
+          name: TruckSpot-Europe-Android-Standalone
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-      - name: Directe APK download maken
+
+      - name: Directe APK voorbereiden
         shell: bash
         run: cp app/build/outputs/apk/debug/app-debug.apk TruckSpot-Europe.apk
-      - name: APK publiceren als GitHub Release
+
+      - name: Nieuwe APK publiceren op GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: test-apk
-          name: TruckSpot Europe - Android testversie
+          name: TruckSpot Europe - Zelfstandige Android testversie
           body: |
-            Eerste Android test-app voor TruckSpot Europe.
-            Installeer alleen als je deze testversie vertrouwt.
-            De app gebruikt internet en opent de TruckSpot-website.
-            Dit is geen versie voor Google Play en geen gecertificeerde trucknavigatie.
+            TruckSpot Europe bevat het eigen startscherm en logo lokaal in de APK.
+            GPS gebruikt locatietoestemming tijdens gebruik.
+            Internet blijft nodig voor kaarttegels, parkeerdata en externe navigatie.
+            Gratis testversie, nog niet geschikt voor gebruik als gecertificeerde trucknavigatie.
           prerelease: true
           make_latest: false
           files: TruckSpot-Europe.apk
