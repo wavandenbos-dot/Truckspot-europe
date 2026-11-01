@@ -1,0 +1,10 @@
+/* Own parking editor */
+.add-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0}
+.add-grid .wide{grid-column:1/-1}
+.add-grid label{display:flex;flex-direction:column;gap:6px;font-weight:700;font-size:13px;min-width:0}
+.add-grid input,.add-grid select,.add-grid textarea{width:100%;padding:11px;border:1px solid #527a58;border-radius:10px;background:#18271e;color:#f5fff5;font-size:16px;min-width:0}
+.add-grid textarea{resize:vertical;min-height:75px}
+.add-grid label.check{flex-direction:row;align-items:center;font-weight:500;line-height:1.45}
+.add-grid label.check input{width:auto;height:20px;min-width:20px;accent-color:#71f42a}
+.add-status{min-height:24px;font-size:13px;color:#d3f6d5;margin:7px 0 10px}
+@media(max-width:350px){.add-grid{grid-template-columns:1fr}}
