@@ -32,7 +32,9 @@ alter table public.truckspot_parking_submissions enable row level security;
 
 -- Preserve least privilege even if PostgreSQL default privileges change.
 revoke all on public.truckspot_parking_submissions from public, anon, authenticated;
-grant select on public.truckspot_parking_submissions to anon, authenticated;
+grant select(id,name,lat,lng,kind,fee,truck_verified,toilets,shower,food,security,notes,status,created_at)
+  on public.truckspot_parking_submissions to anon, authenticated;
+-- Keep anonymous submitter owner_id and moderator review fields private.
 -- Author/approval fields deliberately omitted from INSERT grants.
 grant insert(name,lat,lng,kind,fee,truck_verified,toilets,shower,food,security,notes)
   on public.truckspot_parking_submissions to authenticated;
