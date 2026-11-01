@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090e0c"><title>TruckSpot Europe · V10 | Parkeerplaatsen Europa</title>
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090e0c"><title>TruckSpot Europe · V11 | Parkeerplaatsen Europa</title>
 <link rel="stylesheet" href="./vendor/leaflet.css" crossorigin="anonymous">
 <style>
 :root{color-scheme:dark;--bg:#080d0b;--panel:#121c17;--panel2:#18251d;--lime:#71f42a;--lime2:#b7ffa0;--edge:#304335;--muted:#9baf9f;--text:#f2f9f2;--orange:#ffbd3a;--red:#ff6666}
@@ -50,7 +50,7 @@ const $=s=>document.querySelector(s);
 const ESC=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const CITIES=[['Nederland • Rotterdam',51.93,4.52],['Nederland • Utrecht',52.09,5.12],['Nederland • Venlo',51.37,6.17],['België • Antwerpen',51.22,4.40],['België • Luik',50.64,5.57],['Duitsland • Dortmund',51.51,7.47],['Duitsland • Hamburg',53.55,10.00],['Duitsland • München',48.14,11.58],['Frankrijk • Parijs',48.86,2.35],['Frankrijk • Lyon',45.76,4.83],['Spanje • Barcelona',41.39,2.17],['Spanje • Madrid',40.42,-3.70],['Portugal • Porto',41.15,-8.61],['Italië • Milaan',45.46,9.19],['Italië • Bologna',44.49,11.34],['Oostenrijk • Wenen',48.21,16.37],['Zwitserland • Zürich',47.38,8.54],['Polen • Poznań',52.41,16.93],['Polen • Warschau',52.23,21.01],['Tsjechië • Praag',50.08,14.44],['Slowakije • Bratislava',48.15,17.11],['Hongarije • Boedapest',47.50,19.04],['Roemenië • Boekarest',44.43,26.10],['Bulgarije • Sofia',42.70,23.32],['Kroatië • Zagreb',45.81,15.98],['Slovenië • Ljubljana',46.06,14.51],['Denemarken • Aarhus',56.16,10.20],['Zweden • Malmö',55.61,13.00],['Noorwegen • Oslo',59.91,10.75],['Finland • Helsinki',60.17,24.94],['Verenigd Koninkrijk • Birmingham',52.49,-1.89],['Ierland • Dublin',53.35,-6.26],['Estland • Tallinn',59.44,24.75],['Letland • Riga',56.95,24.11],['Litouwen • Vilnius',54.69,25.28],['Luxemburg • Luxemburg',49.61,6.13],['Griekenland • Thessaloniki',40.64,22.94]];
 const store={get(k,f){try{return JSON.parse(localStorage.getItem(k))??f}catch{return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
-const state={data:[],reports:store.get('ts3_reports',{}),favs:new Set(store.get('ts3_favs',[])),saved:store.get('ts3_savedspots',{}),filter:{free:false,paid:false,toilets:false,shower:false,food:false,security:false,confirmed:false,reported:false},filterView:'all',query:'',sort:'distance',minutes:store.get('ts3_minutes',45),map:null,markers:null,location:null,gpsMarker:null,gpsCircle:null,gpsWatch:null,gpsBusy:false,gpsFollow:false,gpsAge:null,radiusKm:50,lastKey:'',lastFetch:0,pending:false};
+const state={data:[],reports:store.get('ts3_reports',{}),favs:new Set(store.get('ts3_favs',[])),saved:store.get('ts3_savedspots',{}),filter:{free:false,paid:false,toilets:false,shower:false,food:false,security:false,confirmed:false,reported:false},filterView:'all',query:'',sort:'distance',minutes:store.get('ts3_minutes',45),map:null,markers:null,location:null,gpsMarker:null,gpsCircle:null,gpsWatch:null,gpsBusy:false,gpsFollow:false,gpsAge:null,radiusKm:50,searchMode:'map',lastKey:'',lastFetch:0,pending:false};
 const MAX_RESULTS=350, CACHE_MS=1000*60*30, REPORT_MS=1000*60*90, ENDPOINT='https://overpass-api.de/api/interpreter';
 for(let i=0;i<CITIES.length;i++){let o=document.createElement('option');o.value=String(i);o.textContent=CITIES[i][0];$('#region').append(o)}
 function tell(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');clearTimeout(tell.timer);tell.timer=setTimeout(()=>el.classList.remove('show'),4000)}
@@ -58,19 +58,19 @@ function distance(a,b){let rad=x=>x*Math.PI/180,dLat=rad(b.lat-a.lat),dLng=rad(b
 function has(t,k){return /^(yes|designated|official|true|1)$/i.test(t[k]||'')}
 function sourceParking(el){let t=el.tags||{},point=el.type==='node'?el:el.center;if(!point||!Number.isFinite(point.lat)||!Number.isFinite(point.lon))return null;
 if(/^(no|private|agricultural|delivery|forestry)$/i.test(t.hgv||'')||/^(private|no)$/i.test(t.access||''))return null;
-const truck=has(t,'hgv')||Number(t['capacity:hgv'])>0||/\b(truck|lkw|autohof|camion|vrachtwagen|tir\s*park|camiones)\b/i.test(t.name||'');
+const truck=has(t,'hgv')||Number(t['capacity:hgv'])>0||Number(t['capacity:truck'])>0||/\b(truck|lkw|autohof|camion|vrachtwagen|tir\s*park|camiones)\b/i.test(t.name||'');
 const rest=t.highway==='rest_area'||t.highway==='services';
 const sec=has(t,'supervised')||has(t,'surveillance')||has(t,'fenced')||t.surveillance==='camera'||has(t,'security');
 const fee=/^yes$/i.test(t.fee||'')?'paid':/^no$/i.test(t.fee||'')?'free':'unknown';
 let fac={toilets:has(t,'toilets'),shower:has(t,'shower'),food:has(t,'restaurant')||has(t,'food'),security:sec};
-return {id:`osm-${el.type}-${el.id}`,name:t.name|| (rest?'Verzorgingsplaats / rustplaats':'Vrachtwagenparkeerplaats'),lat:point.lat,lng:point.lon,type:rest?'rustplaats':'parking',truck:truck||(!rest&&t['capacity:hgv']!=null),fee,fac,raw:t,sourceUrl:`https://www.openstreetmap.org/${el.type}/${el.id}`};}
+return {id:`osm-${el.type}-${el.id}`,name:t.name|| (rest?'Verzorgingsplaats / rustplaats':'Vrachtwagenparkeerplaats'),lat:point.lat,lng:point.lon,type:rest?'rustplaats':'parking',truck:truck||(!rest&&(t['capacity:hgv']!=null||t['capacity:truck']!=null)),fee,fac,raw:t,sourceUrl:`https://www.openstreetmap.org/${el.type}/${el.id}`};}
 function reportFor(s){let r=state.reports[s.id];return r&&Date.now()-Date.parse(r.at)<REPORT_MS?r:null}
 function badge(s){let r=reportFor(s);return r?({available:['🟢 Leeg','green'],near:['🟠 Bijna vol','orange'],full:['🔴 Vol','red']}[r.status]||['⚪ Onbekend','']):['⚪ Onbekend','']}
 function matches(s){const f=state.filter,term=state.query.toLocaleLowerCase();if(state.filterView==='favs'&&!state.favs.has(s.id))return false;if(term&&!`${s.name} ${s.raw.operator||''} ${s.raw['addr:city']||''}`.toLocaleLowerCase().includes(term))return false;
 if(f.free&&s.fee!=='free')return false;if(f.paid&&s.fee!=='paid')return false;
 if(f.toilets&&!s.fac.toilets)return false;if(f.shower&&!s.fac.shower)return false;if(f.food&&!s.fac.food)return false;if(f.security&&!s.fac.security)return false;if(f.confirmed&&!s.truck)return false;if(f.reported&&!reportFor(s))return false;
 return true;}
-function visible(){let center=state.location||state.map.getCenter();let pool=state.filterView==='favs'?[...new Map([...Object.values(state.saved),...state.data].map(s=>[s.id,s])).values()]:state.data;let a=pool.filter(matches);if(state.location&&state.radiusKm>0&&state.filterView!=='favs')a=a.filter(s=>distance(state.location,s)<=state.radiusKm);if(state.sort==='distance')a.sort((x,y)=>distance(center,x)-distance(center,y));else if(state.sort==='name')a.sort((x,y)=>x.name.localeCompare(y.name));else a.sort((x,y)=>(reportFor(x)?0:1)-(reportFor(y)?0:1));return a}
+function visible(){let center=state.searchMode==='gps'&&state.location?state.location:state.map.getCenter();let pool=state.filterView==='favs'?[...new Map([...Object.values(state.saved),...state.data].map(s=>[s.id,s])).values()]:state.data;let a=pool.filter(matches);if(state.searchMode==='gps'&&state.location&&state.radiusKm>0&&state.filterView!=='favs')a=a.filter(s=>distance(state.location,s)<=state.radiusKm);if(state.sort==='distance')a.sort((x,y)=>distance(center,x)-distance(center,y));else if(state.sort==='name')a.sort((x,y)=>x.name.localeCompare(y.name));else a.sort((x,y)=>(reportFor(x)?0:1)-(reportFor(y)?0:1));return a}
 function facilityBadges(s){return [s.truck?'<span class="chip good">🚛 HGV aangeduid</span>':'<span class="chip warn">🚛 Controleer toegang</span>', s.fee==='free'?'<span class="chip good">Gratis volgens OSM</span>':s.fee==='paid'?'<span class="chip">€ Betaald volgens OSM</span>':'<span class="chip">Tarief onbekend</span>',s.fac.toilets?'<span class="chip">🚻 Toilet</span>':'',s.fac.shower?'<span class="chip">🚿 Douche</span>':'',s.fac.food?'<span class="chip">🍽️ Eten</span>':'',s.fac.security?'<span class="chip warn">🔐 Beveiliging vermeld*</span>':''].join('')}
 function spotCard(s){let b=badge(s),km=distance(state.location||state.map.getCenter(),s),r=reportFor(s);return `<article class="spot"><div class="spot-top"><div style="flex:1;min-width:0"><h2>${ESC(s.name)}</h2><div class="subtitle">${s.type==='rustplaats'?'🛣️ Rustplaats':'🅿️ Parking'} · ≈ ${km.toFixed(1)} km hemelsbreed</div></div><span class="badge ${b[1]}">${b[0]}</span></div><div class="meta">${facilityBadges(s)}</div><div class="subtitle">${r?'Jouw testmelding van '+new Date(r.at).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})+' (alleen op dit apparaat)':'Geen actuele bezettingsinformatie'}</div><div class="actions"><button class="btn" data-action="details" data-id="${s.id}">Details</button><button class="btn" data-action="favorite" data-id="${s.id}">${state.favs.has(s.id)?'♥ Bewaard':'♡ Bewaar'}</button><button class="btn primary" data-action="navigate" data-id="${s.id}">Google Maps ↗</button><button class="btn" data-action="streetview" data-id="${s.id}">📸 Street View ↗</button></div></article>`}
 function draw(){let a=visible();$('#counter').textContent=a.length;$('#favcount').textContent=state.favs.size;$('#subheading').textContent=state.filterView==='favs'?`${a.length} bewaarde locaties`:(state.data.length?`${a.length} zichtbaar van ${state.data.length} geladen locaties${state.location&&state.radiusKm>0?` · binnen ${state.radiusKm} km hemelsbreed`:``}`:'Nog geen parkeerplaatsen geladen');$('#spots').innerHTML=a.length?a.map(spotCard).join(''):`<div class="empty">${state.filterView==='favs'?'Nog geen bewaarde locaties. Tik bij een parkeerplaats op Bewaar.':(state.data.length?'Geen locaties voldoen aan deze filters. Probeer andere filters of laad een nieuw gebied.':'Druk op <b>Vind mij met GPS</b> of selecteer een regio en laad parkeerplaatsen.')}</div>`;
@@ -117,7 +117,8 @@ function fromOsm(json) {
   }
   return [...seen.values()].slice(0,MAX_RESULTS);
 }
-function showParkingResults(spots, label) {
+function showParkingResults(spots, label, mode='map') {
+  state.searchMode=mode;
   state.data=spots;
   state.filterView='all';
   state.query='';
@@ -127,18 +128,35 @@ function showParkingResults(spots, label) {
   $('#mapstatus').textContent='✓ '+spots.length+' parkeerlocaties gevonden '+label+' · bezetting onbekend';
   tell(spots.length?spots.length+' parkeerplaatsen gevonden':'Geen geschikte vrachtwagenparkeerplaats gevonden. Probeer 100 km, of kies een andere regio.');
 }
-async function parkingApi(path,timeoutMs=70000) {
-  const ctrl=new AbortController();
-  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
-  try {
-    const response=await fetch(path,{signal:ctrl.signal,cache:'no-store'});
-    if(!response.ok) {
-      let error='HTTP '+response.status;
-      try {const value=await response.json();error=value.error||error}catch{}
-      throw Error(error);
-    }
-    return fromOsm(await response.json());
-  } finally {clearTimeout(timer)}
+function fallbackQuery(path){
+ const p=new URL(path,window.location.origin).searchParams;
+ const area=p.has('bbox')?'('+p.get('bbox')+')':'(around:'+Math.round(Number(p.get('radius'))*1000)+','+Number(p.get('lat'))+','+Number(p.get('lon'))+')';
+ return '[out:json][timeout:25];('+
+ 'nwr["amenity"="parking"]["hgv"~"^(yes|designated|official)$"]'+area+';'+
+ 'nwr["amenity"="parking"]["capacity:hgv"]'+area+';'+
+ 'nwr["amenity"="parking"]["capacity:truck"]'+area+';'+
+ 'nwr["amenity"="truck_stop"]'+area+';'+
+ 'nwr["highway"~"^(rest_area|services)$"]'+area+';);out center tags 350;';
+}
+async function parkingApi(path,timeoutMs=70000){
+ const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+ let failures='';
+ try{
+  try{
+    const res=await fetch(path,{signal:ctrl.signal,cache:'no-store'});
+    if(!res.ok){let message='Android HTTP '+res.status;try{let v=await res.json();message=v.error||message}catch{}throw Error(message)}
+    return fromOsm(await res.json());
+  }catch(e){failures='Android: '+(e.message||e)}
+  for(const endpoint of ['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter']){
+    try{
+      $('#mapstatus').textContent='⏳ Alternatieve parkeerbron zoeken…';
+      const res=await fetch(endpoint,{method:'POST',body:new URLSearchParams({data:fallbackQuery(path)}),signal:ctrl.signal});
+      if(!res.ok)throw Error('HTTP '+res.status);
+      return fromOsm(await res.json());
+    }catch(e){failures+=' | '+new URL(endpoint).hostname+': '+(e.message||e)}
+  }
+  throw Error(failures||'Parkeerdata niet beschikbaar');
+ }finally{clearTimeout(timer)}
 }
 async function fetchLocations(){
   if(state.pending||!state.map)return;
@@ -150,7 +168,7 @@ async function fetchLocations(){
   const key='ts9_bbox_'+bboxKey();
   const cached=store.get(key,null);
   if(cached&&Date.now()-cached.at<CACHE_MS){
-    showParkingResults(cached.items,'uit cache');return;
+    showParkingResults(cached.items,'uit cache','map');return;
   }
   if(Date.now()-state.lastFetch<15000){tell('Probeer over enkele seconden opnieuw om de gegevensdienst te ontzien.');return}
   state.pending=true;state.lastFetch=Date.now();$('#load').disabled=true;
@@ -159,14 +177,25 @@ async function fetchLocations(){
     const b=[bounds.getSouth(),bounds.getWest(),bounds.getNorth(),bounds.getEast()].map(v=>v.toFixed(5)).join(',');
     const spots=await parkingApi('/api/parking?bbox='+encodeURIComponent(b));
     if(spots.length)store.set(key,{at:Date.now(),items:spots});
-    showParkingResults(spots,'op de kaart');
+    showParkingResults(spots,'op de kaart','map');
   } catch(e) {
     $('#mapstatus').textContent='⚠ Parkeerdata niet geladen: '+String(e.message||'netwerkfout');
     tell('Zoeken mislukt. Controleer internet en probeer later nogmaals.');
     console.warn('Overpass proxy lookup:',e);
   } finally {state.pending=false;$('#load').disabled=false;$('#load').textContent='🅿️ Laad echte locaties'}
 }
-function init(){if(!window.L){$('#mapstatus').textContent='Kaartbibliotheek kan niet laden — internet nodig';$('#load').disabled=true;return}state.map=L.map('map',{scrollWheelZoom:false}).setView([51.4,6.15],9);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>-bijdragers',maxZoom:18}).addTo(state.map);state.markers=L.layerGroup().addTo(state.map);state.map.on('moveend',()=>{if(!state.pending){$('#mapstatus').textContent='↻ Kaart verplaatst — klik Laad voor deze regio'}});draw()}
+function init(){
+ if(!window.L){$('#mapstatus').textContent='Kaartbibliotheek niet beschikbaar';$('#load').disabled=true;return}
+ const saved=store.get('ts11_mapview',null);
+ const valid=saved&&Number.isFinite(saved.lat)&&Number.isFinite(saved.lng)&&Number.isFinite(saved.zoom)&&Math.abs(saved.lat)<=90&&Math.abs(saved.lng)<=180&&saved.zoom>=3&&saved.zoom<=18;
+ state.map=L.map('map',{scrollWheelZoom:false}).setView(valid?[saved.lat,saved.lng]:[51.4,6.15],valid?saved.zoom:9);
+ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>-bijdragers',maxZoom:18}).addTo(state.map);
+ state.markers=L.layerGroup().addTo(state.map);
+ state.map.on('moveend',()=>{let center=state.map.getCenter();store.set('ts11_mapview',{lat:center.lat,lng:center.lng,zoom:state.map.getZoom()});if(!state.pending)$('#mapstatus').textContent='↻ Kaartpositie opgeslagen — tik Laad voor dit gebied'});
+ state.map.on('dragstart',()=>{if(state.gpsFollow)setFollow(false)});
+ if(valid)$('#mapstatus').textContent='✓ Vorige kaartpositie hersteld';
+ draw();
+}
 $('#region').addEventListener('change',e=>{if(e.target.value==='')return;const c=CITIES[+e.target.value];state.map?.setView([c[1],c[2]],11);tell(`Regio ingesteld op ${c[0]}. Druk op Laad.`)});
 $('#googlemap').addEventListener('click',googleCurrentMap);$('#mapexpand').addEventListener('click',toggleBigMap);
 $('#load').addEventListener('click',fetchLocations);$('#search').addEventListener('input',e=>{state.query=e.target.value.trim();draw()});$('#filters').addEventListener('click',openFilters);$('#time').addEventListener('click',openTime);$('#help').addEventListener('click',()=>showSheet('Over TruckSpot Europe V4',`<p>Deze versie haalt <b>echte locaties uit OpenStreetMap</b> op wanneer je op Laad klikt. Dit werkt in geselecteerde kaartgebieden in heel Europa, maar gegevens kunnen ontbreken.</p><p>🟢 Chauffeursmeldingen worden nu alleen op dit apparaat bewaard.<br>⚪ Bezetting zonder eigen melding is onbekend.<br>🚛 Niet elk rustterrein is geschikt voor vrachtwagens.<br>⏱️ Rijtijd is nog niet gekoppeld aan een tachograaf of vrachtwagenrouter.<br>🔐 Beveiligingsvoorzieningen zijn niet geverifieerd.<br>📍 GPS wordt alleen na toestemming gebruikt, in deze versie niet op een TruckSpot-server opgeslagen.</p><div class="callout">De openbare Overpass API is alleen geschikt voor prototypes en beperkt gebruik. Voor een echte Europese app komt er een eigen cachingdienst, Europese parkeerdatabase en een veilig online meldingssysteem.</div><p>Bron: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap-bijdragers, ODbL</a>.</p>`));
@@ -210,7 +239,7 @@ async function loadNearMe(){
   state.map.setView([loc.lat,loc.lng],zoom);
   const key='ts9_gps_'+loc.lat.toFixed(2)+'_'+loc.lng.toFixed(2)+'_'+km;
   const cached=store.get(key,null);
-  if(cached&&Date.now()-cached.at<CACHE_MS){showParkingResults(cached.items,'binnen '+km+' km uit cache');return}
+  if(cached&&Date.now()-cached.at<CACHE_MS){showParkingResults(cached.items,'binnen '+km+' km uit cache','gps');return}
   if(Date.now()-state.lastFetch<15000){tell('Wacht enkele seconden tussen zoekopdrachten.');return}
   state.pending=true;state.lastFetch=Date.now();$('#nearby').disabled=true;
   $('#mapstatus').textContent='⏳ Parkeerplaatsen binnen '+km+' km van jouw GPS ophalen…';
@@ -218,7 +247,7 @@ async function loadNearMe(){
     const url='/api/parking?lat='+loc.lat.toFixed(5)+'&lon='+loc.lng.toFixed(5)+'&radius='+km;
     const spots=await parkingApi(url);
     if(spots.length)store.set(key,{at:Date.now(),items:spots});
-    showParkingResults(spots,'binnen '+km+' km');
+    showParkingResults(spots,'binnen '+km+' km','gps');
   }catch(e){
     $('#mapstatus').textContent='⚠ GPS gevonden, maar parkeerdata ophalen mislukt: '+String(e.message||'netwerkfout');
     tell('GPS gevonden, parkeerdata niet beschikbaar.');
@@ -226,7 +255,7 @@ async function loadNearMe(){
   }finally{state.pending=false;$('#nearby').disabled=false}
 }
 function requestGps(loadAfter=false){if(!gpsCheck()||state.gpsBusy)return;
- state.gpsBusy=true;$('#gps').disabled=true;$('#gps').textContent='⌛ GPS zoeken…';gpsStatus('📍 Locatie opvragen… geef toestemming in Chrome.');
+ state.gpsBusy=true;$('#gps').disabled=true;$('#gps').textContent='⌛ GPS zoeken…';gpsStatus('📍 Locatie opvragen… geef toestemming op je telefoon.');
  navigator.geolocation.getCurrentPosition(pos=>{
   state.gpsBusy=false;$('#gps').disabled=false;$('#gps').textContent='📍 GPS vernieuwen';
   if(gpsFix(pos,true)){if(loadAfter)loadNearMe();else tell('GPS gevonden. Tik op Zoek bij mij om parkeerplaatsen op te halen.')}

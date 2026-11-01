@@ -155,6 +155,7 @@ public final class MainActivity extends Activity {
         String query = "[out:json][timeout:25];("
                 + "nwr[\"amenity\"=\"parking\"][\"hgv\"~\"^(yes|designated|official)$\"]" + area + ";"
                 + "nwr[\"amenity\"=\"parking\"][\"capacity:hgv\"]" + area + ";"
+                + "nwr[\"amenity\"=\"parking\"][\"capacity:truck\"]" + area + ";"
                 + "nwr[\"amenity\"=\"parking\"][\"name\"~\"(truck|lkw|autohof|camion|vrachtwagen|camiones|tir|rast|poids.lourds)\",i]" + area + ";"
                 + "nwr[\"highway\"~\"^(rest_area|services)$\"]" + area + ";"
                 + "nwr[\"amenity\"=\"truck_stop\"]" + area + ";"
@@ -164,6 +165,7 @@ public final class MainActivity extends Activity {
             "https://overpass.private.coffee/api/interpreter",
             "https://overpass-api.de/api/interpreter"
         };
+        String failures="";
         for (String endpoint:servers) {
             HttpURLConnection connection = null;
             try {
@@ -173,14 +175,15 @@ public final class MainActivity extends Activity {
                 connection.setReadTimeout(26000);
                 connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
                 connection.setRequestProperty("Accept", "application/json");
-                connection.setRequestProperty("User-Agent", "TruckSpot-Europe-Android-Test/0.10");
+                connection.setRequestProperty("User-Agent", "TruckSpot-Europe-Android-Test/0.11");
                 connection.setDoOutput(true);
                 byte[] payload = ("data=" + URLEncoder.encode(query, "UTF-8"))
                         .getBytes(StandardCharsets.UTF_8);
                 try (OutputStream out = connection.getOutputStream()) {
                     out.write(payload);
                 }
-                if (connection.getResponseCode() != 200) continue;
+                int code=connection.getResponseCode();
+                if(code!=200){failures+=Uri.parse(endpoint).getHost()+": HTTP "+code+"; ";continue;}
                 byte[] body;
                 try (InputStream in = connection.getInputStream()) {
                     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -193,19 +196,19 @@ public final class MainActivity extends Activity {
                     body = bytes.toByteArray();
                 }
                 String result = new String(body, StandardCharsets.UTF_8);
-                if (!result.trim().startsWith("{") || !result.contains("\"elements\"")) continue;
+                if (!result.trim().startsWith("{") || !result.contains("\"elements\"")){failures+=Uri.parse(endpoint).getHost()+": onjuist antwoord; ";continue;}
                 Map<String,String> headers = new HashMap<>();
                 headers.put("Cache-Control", "no-store");
                 headers.put("X-Content-Type-Options", "nosniff");
                 return new WebResourceResponse("application/json", "UTF-8", 200, "OK",
                        headers, new ByteArrayInputStream(body));
-            } catch (IOException ignored) {
-                // Public servers may be busy. Try the next server once.
+            } catch (IOException err) {
+                failures+=Uri.parse(endpoint).getHost()+": "+err.getClass().getSimpleName()+"; ";
             } finally {
                 if (connection != null) connection.disconnect();
             }
         }
-        return errorJson(503, "Parkeerdata tijdelijk niet bereikbaar. Probeer later opnieuw.");
+        return errorJson(503, "Parkeerbronnen niet bereikbaar: "+failures);
     }
     private String fmt(double value) {
         return String.format(Locale.US, "%.5f", value);
