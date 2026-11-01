@@ -30,77 +30,66 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: V8-schermen en kaartbibliotheek inbouwen
+      - name: Ingebouwde V8-kaart en icoon gereedmaken
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p app/src/main/assets/web/{icons,vendor} app/src/main/res/drawable
-          if [ ! -s app/src/main/assets/web/index.html ]; then
-            echo "V7-bron eenmalig opslaan in de APK en GitHub."
-            curl --fail --location --retry 3 --connect-timeout 15 \
-              'https://inspiring-melba-a85bfd.netlify.app/' \
-              --output app/src/main/assets/web/index.html
-            curl --fail --location --retry 3 --connect-timeout 15 \
-              'https://inspiring-melba-a85bfd.netlify.app/icons/icon-192.png' \
-              --output app/src/main/assets/web/icons/icon-192.png
-            curl --fail --location --retry 3 --connect-timeout 15 \
-              'https://inspiring-melba-a85bfd.netlify.app/icons/icon-512.png' \
-              --output app/src/main/assets/web/icons/icon-512.png
+          mkdir -p app/src/main/assets/web/vendor app/src/main/res/drawable
+          test -s app/src/main/assets/web/index.html
+          if [ ! -s app/src/main/assets/web/vendor/leaflet.js ]; then
             curl --fail --location --retry 3 \
               'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js' \
               --output app/src/main/assets/web/vendor/leaflet.js
+          fi
+          if [ ! -s app/src/main/assets/web/vendor/leaflet.css ]; then
             curl --fail --location --retry 3 \
               'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css' \
               --output app/src/main/assets/web/vendor/leaflet.css
-            python3 - <<'PY'
-          from pathlib import Path
-          p=Path('app/src/main/assets/web/index.html')
-          s=p.read_text(encoding='utf-8')
-          assert 'TruckSpot' in s and 'navigator.geolocation' in s and 'Leaflet' in s or 'leaflet.js' in s
-          s=s.replace('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css','./vendor/leaflet.css')
-          s=s.replace('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js','./vendor/leaflet.js')
-          s=s.replace('window.open(', 'window.location.assign(')
-          s=s.replace('V7 • GPS + PARKINGS','V8 • STANDALONE')
-          s=s.replace('V7 | GPS + parkeerplaatsen','V8 | Android standalone')
-          import re
-          s=re.sub(r"if\('serviceWorker' in navigator && window.isSecureContext\)\{\s*window.addEventListener\('load',\(\)=>navigator.serviceWorker.register\('\./sw\.js'\).*?\);\s*\}", '', s, flags=re.S)
-          p.write_text(s,encoding='utf-8')
-          PY
-            cp app/src/main/assets/web/icons/icon-192.png app/src/main/res/drawable/truckspot_branded_icon.png
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add app/src/main/assets/web app/src/main/res/drawable/truckspot_branded_icon.png
-            git commit -m "Snapshot V8 standalone app resources" || true
-            git push origin HEAD:main || true
           fi
-          test -s app/src/main/assets/web/index.html
-          test -s app/src/main/assets/web/vendor/leaflet.js
+          if [ ! -s app/src/main/res/drawable/truckspot_branded_icon.png ]; then
+            python3 - <<'PY'
+          import base64,re
+          from pathlib import Path
+          s=Path('app/src/main/assets/web/index.html').read_text()
+          m=re.search(r'data:image/png;base64,([A-Za-z0-9+/=]+)',s)
+          assert m, "Logo ontbreekt"
+          Path('app/src/main/res/drawable/truckspot_branded_icon.png').write_bytes(base64.b64decode(m.group(1)))
+          PY
+          fi
           test -s app/src/main/res/drawable/truckspot_branded_icon.png
           grep -q './vendor/leaflet.js' app/src/main/assets/web/index.html
           grep -q 'navigator.geolocation' app/src/main/assets/web/index.html
-          echo "TruckSpot-schermen worden nu uit de APK geladen (zonder Netlify)."
+          node --version
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('app/src/main/assets/web/index.html').read_text()
+          parts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S|re.I)
+          Path('/tmp/truckspot-inline.js').write_text('\n'.join(parts))
+          PY
+          node --check /tmp/truckspot-inline.js
+          echo "TruckSpot UI is opgeslagen in de APK; Netlify is niet nodig."
       - name: APK compileren
         run: gradle --no-daemon --stacktrace :app:assembleDebug
-      - name: APK aan GitHub Actions toevoegen
+      - name: APK als Artifact bewaren
         uses: actions/upload-artifact@v4
         with:
           name: TruckSpot-Europe-V8-Standalone
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-      - name: Directe APK-download
-        shell: bash
+      - name: Directe download maken
         run: cp app/build/outputs/apk/debug/app-debug.apk TruckSpot-Europe-V8-Standalone.apk
-      - name: GitHub Release publiceren
+      - name: APK publiceren als GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v8-standalone-test
           name: TruckSpot Europe V8 - Standalone Android
           body: |
-            V8-testversie. Het TruckSpot-scherm, logo en kaartbibliotheek
-            zitten in de APK. Netlify is niet meer nodig om de app te starten.
-            Internet is wel nodig voor kaarttegels en actuele parkeerlocaties.
-            Dit is geen gecertificeerde vrachtwagennavigatie.
-            V7 testmeldingen blijven lokaal; er is geen gedeelde livebezetting.
+            TruckSpot V8-testapp met UI en logo ingebouwd in de APK.
+            De APK opent niet langer de Netlify-website.
+            Internet blijft nodig voor OpenStreetMap-kaarten en parkeergegevens.
+            GPS werkt na toestemming en is niet gekoppeld aan een tachograaf.
+            Parkeermeldingen blijven voorlopig alleen lokaal zichtbaar.
           prerelease: true
           make_latest: false
           files: TruckSpot-Europe-V8-Standalone.apk
