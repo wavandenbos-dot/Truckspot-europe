@@ -6,7 +6,7 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.truckspot_parking_submissions (
   id uuid primary key default gen_random_uuid(),
-  owner_id uuid not null default (select auth.uid()),
+  owner_id uuid not null default auth.uid(),
   name text not null check (length(trim(name)) between 3 and 80),
   lat double precision not null check (lat between -90 and 90),
   lng double precision not null check (lng between -180 and 180),
@@ -55,9 +55,12 @@ create policy "TruckSpot signed-in drivers submit pending only"
 -- Server-side flood limit: 5 submissions per authenticated user per 24 h.
 -- Also enable Supabase Anonymous Sign-ins CAPTCHA/IP limits in dashboard:
 -- a malicious actor can otherwise create more anonymous users.
-create or replace function public.truckspot_submission_guard()
+create schema if not exists truckspot_private;
+revoke all on schema truckspot_private from public, anon, authenticated;
+
+create or replace function truckspot_private.truckspot_submission_guard()
 returns trigger language plpgsql security definer
-set search_path = public, pg_temp
+set search_path = pg_catalog, pg_temp
 as $$
 begin
   if auth.uid() is null or new.owner_id is distinct from auth.uid() then
@@ -78,11 +81,11 @@ begin
   return new;
 end;
 $$;
-revoke all on function public.truckspot_submission_guard() from public,anon,authenticated;
+revoke all on function truckspot_private.truckspot_submission_guard() from public,anon,authenticated;
 drop trigger if exists truckspot_submission_guard_trigger on public.truckspot_parking_submissions;
 create trigger truckspot_submission_guard_trigger
   before insert on public.truckspot_parking_submissions
-  for each row execute function public.truckspot_submission_guard();
+  for each row execute function truckspot_private.truckspot_submission_guard();
 
 -- Test in SQL Editor (admin only):
 -- select id,name,lat,lng,status,created_at from public.truckspot_parking_submissions where status='pending' order by created_at desc;
