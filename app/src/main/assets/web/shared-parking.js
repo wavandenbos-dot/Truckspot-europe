@@ -1,6 +1,6 @@
 'use strict';
 /*
- * TruckSpot Shared Parking V15
+ * TruckSpot Shared Parking V104
  * Supabase public read + anonymous sign-in for submissions, approval-only publishing.
  * It is deliberately inactive without shared-config.json containing a project URL
  * and PUBLISHABLE key. Never insert service_role or secret keys.
@@ -29,9 +29,33 @@
    note:s.notes||'',shared:true,overnightVerified:s.overnight_verified===true,overnightSource:s.overnight_source||'',raw:{operator:'','addr:city':''},
    sourceUrl:'https://www.openstreetmap.org/?mlat='+s.lat+'&mlon='+s.lng+'#map=15/'+s.lat+'/'+s.lng};
  }
+async function loadApprovedCorrections(bounds){
+  const query=new URLSearchParams({
+   select:'source_spot_id,spot_name,lat,lng,overnight,evidence,created_at',
+   status:'eq.approved',
+   lat:'gte.'+Math.max(-90,bounds.south),
+   lng:'gte.'+Math.max(-180,bounds.west),
+   order:'created_at.desc',limit:'250'
+  });
+  query.append('lat','lte.'+Math.min(90,bounds.north));
+  query.append('lng','lte.'+Math.min(180,bounds.east));
+  const r=await fetch(base()+'/rest/v1/truckspot_parking_corrections?'+query,{headers:headers(),cache:'no-store'});
+  if(!r.ok)throw Error('HTTP '+r.status);
+  const rows=await r.json();
+  if(!Array.isArray(rows))throw Error('Ongeldige correctiegegevens');
+  const result=Object.create(null);
+  for(const row of rows){
+   if(typeof row.source_spot_id!=='string'||!(/^(listed|osm|shared)-/.test(row.source_spot_id)))continue;
+   if(result[row.source_spot_id]||!Number.isFinite(row.lat)||!Number.isFinite(row.lng))continue;
+   if(!['yes','no'].includes(row.overnight)||typeof row.evidence!=='string')continue;
+   result[row.source_spot_id]=row; // Newest approved report per source spot.
+  }
+  state.publicCorrections=result;
+  return Object.keys(result).length;
+ }
  async function refresh(force=false){
   if(!configured())return;
-  if(busy||(!force&&Date.now()-lastFetch<20000))return;
+  if(busy||(!force&&Date.now()-lastFetch<6000))return;
   const b=areaBounds();if(!b)return;
   busy=true;lastFetch=Date.now();
   setStatus('🌍 Goedgekeurde gedeelde parkeerplaatsen ophalen…');
@@ -49,8 +73,11 @@
    const rows=await res.json();
    if(!Array.isArray(rows))throw Error('Ongeldig serverantwoord');
    state.shared=rows.filter(r=>Number.isFinite(r.lat)&&Number.isFinite(r.lng)&&typeof r.name==='string'&&r.truck_verified===true&&r.overnight_verified===true).map(toSpot);
+   let correctionCount=null;
+   try{correctionCount=await loadApprovedCorrections(b)}
+   catch(e){console.warn('Chauffeurscorrecties laden mislukt:',e)}
    draw();
-   setStatus('🌍 '+rows.length+' gedeelde, goedgekeurde parkeerplekken in deze omgeving. Nieuwe meldingen verschijnen pas na controle.');
+   setStatus('🌍 '+rows.length+' goedgekeurde deelplekken · '+(correctionCount===null?'chauffeursmeldingen tijdelijk niet bereikbaar':correctionCount+' beoordeelde chauffeursmeldingen')+'. Nieuwe meldingen verschijnen pas na controle.');
   }catch(e){setStatus('⚠ Gedeelde parkeerplaatsen niet bereikbaar ('+(e.message||'netwerkfout')+'). Je lokale kaart werkt wel.')}
   finally{busy=false}
  }
@@ -127,7 +154,42 @@
    showSheet('⚠ Insturen mislukt','<p>'+ESC(String(e.message||'Onbekende netwerkfout'))+'</p><p>Je eigen parkeerplaats staat nog op je telefoon. Je kunt het later opnieuw proberen.</p>');
   }
  }
- async function init(){
+async function submitCorrection(id){
+ const spot=getSpot(id),c=state.corrections[id];
+ if(!spot||spot.userAdded||!c||!['yes','no'].includes(c.overnight)||typeof c.note!=='string'||c.note.trim().length<8){
+  tell('Bewaar eerst een onderbouwde correctie voor deze bestaande parkeerplaats.');return;
+ }
+ if(c.submittedAt){tell('Deze correctie is al ingestuurd voor beoordeling.');return}
+ if(!configured()){
+  showSheet('🌍 Delen is tijdelijk niet beschikbaar','<p>Je correctie blijft op deze telefoon staan; de gedeelde database is niet verbonden.</p>');
+  return;
+ }
+ if(!confirm('Deze melding en de toelichting opsturen voor beoordeling? Na goedkeuring kunnen andere chauffeurs dit lezen als chauffeursmelding, niet als officiële toestemming. Vermeld geen persoonsgegevens.'))return;
+ try{
+  const token=await getSession();
+  const payload={source_spot_id:spot.id,spot_name:spot.name.slice(0,120),
+   lat:spot.lat,lng:spot.lng,overnight:c.overnight,evidence:c.note.slice(0,220)};
+  const r=await fetch(base()+'/rest/v1/truckspot_parking_corrections',{
+   method:'POST',
+   headers:{...headers(token),'Content-Type':'application/json','Prefer':'return=minimal'},
+   body:JSON.stringify(payload)
+  });
+  if(!r.ok){
+   let msg='HTTP '+r.status;
+   try{const data=await r.json();msg=data.message||data.error_description||msg}catch{}
+   throw Error(msg);
+  }
+  if(state.corrections[id]===c){
+   c.submittedAt=new Date().toISOString();
+   store.set('ts103_parking_corrections',state.corrections);
+  }
+  showSheet('✅ Correctie ingestuurd',
+   '<p>Je chauffeursmelding is ingestuurd voor beoordeling. <b>Hij wordt niet meteen zichtbaar voor anderen.</b></p><p>De originele brongegevens blijven ongewijzigd. Jouw eigen correctie blijft op je telefoon.</p>');
+ }catch(e){
+  showSheet('⚠ Insturen mislukt','<p>'+ESC(String(e.message||'Onbekende netwerkfout'))+'</p><p>Je lokale correctie is bewaard; probeer het later opnieuw.</p>');
+ }
+}
+async function init(){
   try{
    const r=await fetch('./shared-config.json',{cache:'no-store'});
    if(!r.ok)throw Error('config ontbreekt');
@@ -150,8 +212,10 @@
   refresh(true);
  });
  document.getElementById('sheetbody').addEventListener('click',ev=>{
-  const b=ev.target.closest('button[data-shared="submit"]');
-  if(b)submitLocal(b.dataset.id);
+  const b=ev.target.closest('button[data-shared]');
+  if(!b)return;
+  if(b.dataset.shared==='submit')submitLocal(b.dataset.id);
+  else if(b.dataset.shared==='correction')submitCorrection(b.dataset.id);
  });
  window.TruckSpotShared={refresh,enabled:()=>Boolean(configured())};
  init();
