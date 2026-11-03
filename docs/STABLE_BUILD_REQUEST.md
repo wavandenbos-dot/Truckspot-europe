@@ -1,1 +1,1 @@
-Tweede diagnostische bouwpoging voor stabiele APK 1.0.0. Foutmeldingen controleren uitsluitend of de vier GitHub secrets aanwezig zijn, het JKS-bestand kan worden gedecodeerd en de alias bestaat; er worden geen wachtwoorden of sleutelgegevens gelogd.
+Derde controlebouw 1.0.0. Alleen extra spaties, tabs en regeleinden worden bij het decoderen van de beveiligde JKS-waarde genegeerd. Sleutelinhoud en wachtwoorden worden niet gelogd.

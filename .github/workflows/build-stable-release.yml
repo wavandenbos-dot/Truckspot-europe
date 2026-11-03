@@ -133,8 +133,8 @@ jobs:
             fi
           done
           echo "Alle vier beveiligde GitHub secrets zijn beschikbaar."
-          if ! printf '%s' "$TRUCKSPOT_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/truckspot-stable.jks"; then
-            echo "::error::De base64-waarde is onjuist. Controleer TRUCKSPOT_KEYSTORE_B64."
+          if ! printf '%s' "$TRUCKSPOT_KEYSTORE_B64" | tr -d '[:space:]' | base64 --decode > "$RUNNER_TEMP/truckspot-stable.jks"; then
+            echo "::error::TRUCKSPOT_KEYSTORE_B64 is niet geldige Base64, ook na verwijderen van witruimte. Kopieer opnieuw de volledige inhoud van truckspot-github-secret.txt naar de GitHub secret."
             exit 1
           fi
           chmod 600 "$RUNNER_TEMP/truckspot-stable.jks"
