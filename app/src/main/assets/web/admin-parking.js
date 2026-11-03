@@ -61,7 +61,7 @@ function registrationScreen(info=''){
   const email=(document.getElementById('admin-register-email')?.value||'').trim();
   const pw=document.getElementById('admin-register-password')?.value||'';
   const again=document.getElementById('admin-register-confirm')?.value||'';
-  if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)||email.length>200)return status('Vul een geldig e-mailadres in.');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>200)return status('Vul een geldig e-mailadres in.');
   if(pw.length<12||pw.length>128)return status('Kies een wachtwoord van minstens 12 en maximaal 128 tekens.');
   if(pw!==again)return status('De twee wachtwoorden zijn niet gelijk.');
   working=true;status('Beveiligd account aanmaken…');
