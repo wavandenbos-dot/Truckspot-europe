@@ -1,31 +1,25 @@
-# TruckSpot Europe 1.0.4 — chauffeurscorrecties samen delen na beoordeling
+# TruckSpot Europe 1.0.5 — zelf chauffeurmeldingen beoordelen
 
-Deze update gebruikt dezelfde Android-app-ID (`eu.truckspot.europe.stable`) en dezelfde ondertekening als 1.0.3. **Bijwerken, niet verwijderen**: eigen parkeerplaatsen, favorieten en bestaande lokale correcties blijven dan op de Samsung staan.
+Blijft dezelfde gesigneerde app-ID gebruiken (`eu.truckspot.europe.stable`) als 1.0.4. Bijwerken over de bestaande installatie, nooit verwijderen: lokale eigen parkeerplaatsen, favorieten en nachtparkeercorrecties blijven behouden.
 
-## Wat is nieuw?
-- Bestaande parkeerplaats: open **Details → Nachtparkeren aanpassen**, kies ja/nee, vul een gecontroleerde toelichting in en bewaar de wijziging lokaal.
-- Open de details opnieuw en kies **🌍 Correctie insturen voor controle**. De gebruiker bevestigt expliciet dat locatie en toelichting na goedkeuring openbaar kunnen worden.
-- Gedeelde chauffeurcorrecties worden in een afzonderlijke Supabase-tabel `truckspot_parking_corrections` opgeslagen als `pending`, nooit meteen als bevestigd. Alleen bevoegde databasebeheerders kunnen een rij goedkeuren of afwijzen.
-- De app haalt goedgekeurde correcties op, toont ze als **beoordeelde chauffeursmeldingen, niet als officiële toestemming** en blijft bronbevestigde nachtparking onderscheiden van meningen van chauffeurs.
-- De eigen lokale correctie heeft altijd een afzonderlijke aanduiding. Insturen gebeurt niet automatisch.
-- De bestaande gedeelde parkingfunctie en ingebouwde Europese kaart blijven actief.
+## Beheerdersscherm (HANDMATIG, geen automatische goedkeuring)
+- Nieuwe knop **🔒 Beheer** bij de gedeelde parkings.
+- Apart Supabase Auth e-mail/wachtwoord voor de beheerder. Inlogtoken alleen tijdens de lopende app-sessie in geheugen, geen wachtwoorden of beheerder-API-sleutels in de APK.
+- Geeft alleen toegang met een **door de beheerder in de Supabase database ingestelde** `auth.users.raw_app_meta_data.truckspot_moderator = true`, en een **niet-anoniem** Auth-account. Anonieme chauffeuraccounts kunnen zichzelf deze rol niet geven.
+- Geeft een lijst van alle wachtende nieuwe parkeerplaatsen en chauffeurscorrecties, met bronnotitie en kaartlink.
+- Beheerder kan handmatig **goedkeuren / afwijzen**. Voor nieuwe truckparkings vraagt goedkeuring bovendien om een onafhankelijk gecontroleerde bron van minimaal twaalf tekens, die op de server wordt opgeslagen en afgedwongen.
+- Aangepaste nachtparkeercorrecties blijven ook na goedkeuring **chauffeursmeldingen**, niet officiële operatorbevestigingen.
+- Supabase RLS laat andere chauffeurs nooit pending meldingen lezen of goedkeuren; review is een afgebakende statusovergang van `pending` naar `approved` of `rejected`, met serverdatum.
+- Inloggen is pas mogelijk wanneer de eigenaar **zelf een apart, echt e-mail/wachtwoord-account** in Supabase Auth laat aanmaken en dit vervolgens veilig markeert als moderator. Bestaande twee anonieme chauffeursaccounts zijn uitdrukkelijk NIET gemachtigd. Geen vooraf ingestelde wachtwoorden.
+- Geen automatische moderatie, ook geen automatisch goedkeuren bij het insturen.
 
-## Veiligheid en privacy
-- Geen geheime server- of beheerder-API-sleutels in de APK; alleen de publieke Supabase-clientconfiguratie.
-- Row Level Security laat alleen `approved` chauffeurmeldingen uitlezen. Aanmaken is beperkt tot ingelogde chauffeurs met `pending` status; geen gebruiker mag zelf `approved` publiceren.
-- De database bewaart een anonieme auteursaanduiding, die niet voor de publieke app uitleesbaar is; maximaal vijf correcties per account per 24 uur.
-- Gebruik geen persoonsgegevens in de toelichting. Eerdere inzendingen kunnen niet worden ingetrokken door de lokale correctie te verwijderen.
-- De status van nachtparkeren blijft afhankelijk van de lokale borden en de bevoegde beheerder. De app geeft geen juridische garantie en geen actuele bezetting.
+## Nederlandse snelwegverzorgingsplaatsen
+De tekst in de app is nauwkeuriger gemaakt: RWS richt verzorgingsplaatsen in voor korte rust, maar er bestaan per locatie parkeerborden met een eigen maximale parkeerduur, bijvoorbeeld **24 uur**. Dat is geen algemene Nederlandse 24-uursregel en bewijst op zichzelf niet dat overnachten officieel mag. De app adviseert per locatie borden, toestemming en eventuele parkeerduurbeperking te controleren. NL-verzorgingsplaatsen worden niet generiek als **verboden voor overnachten** aangeduid.
 
-## Moderatie
-Nieuwe meldingen kunnen met beheerderstoegang worden bekeken via:
-`select id, source_spot_id, spot_name, overnight, evidence, status, created_at from public.truckspot_parking_corrections where status='pending' order by created_at;`
+## Database
+Beveiligde migratie `supabase/migrations/20261103_truckspot_manual_moderation.sql` is al toegepast op het werkende Supabase-project vóór de release. In de Auth-database stond op testdatum nog geen e-mail/wachtwoord-moderator; het account moet afzonderlijk worden geactiveerd.
 
-Na controle van de bron:
-`update public.truckspot_parking_corrections set status='approved',reviewed_at=now() where id='<gecontroleerd-id>';`
+## Test
+Na installatie: open **🔒 Beheer**. Zonder apart gemachtigde moderator wordt toegang geweigerd (bedoeld). Met moderatorlogin: pending meldingen controleren, goedkeuren of afwijzen. Controleer de originele borden, de beheerder of een betrouwbare bron vóór goedkeuring.
 
-Bij twijfel: `status='rejected'`, of laat `pending` staan. Een goedgekeurde chauffeurmelding is nog steeds geen operatorbevestiging.
-
-Bijbehorende SQL: `supabase/migrations/20261103_driver_overnight_corrections.sql`. De migratie is op het project toegepast voordat deze stabiele build gepubliceerd wordt.
-
-Versie: **1.0.4**, versionCode **104**, Android-pakket **eu.truckspot.europe.stable**.
+Versie: **1.0.5**, versionCode **105**, Android package **eu.truckspot.europe.stable**.
