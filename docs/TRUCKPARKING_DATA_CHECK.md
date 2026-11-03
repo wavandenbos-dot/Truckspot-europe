@@ -1,3 +1,3 @@
-# Vierde onderzoeksrun
+# Vijfde inspectie: 24 uur geopende truckparkings
 
-Controleer het aantal bruikbare truckstops en officiële nationale toegangspunten in Europa.
+Zoek naar 24/7-open vrachtwagenparkeerplaatsen met expliciete vrachtwagenparkeerfunctie, voor een verantwoord bronfilter.

@@ -116,3 +116,22 @@ jobs:
           print('GREEK_FEED_KEYS',list(gr),'GREEK_ITEMS',len(gr.get('items',[])))
           print('GREEK_SAMPLE',str(gr.get('items',[])[:2])[:2500])
           PY
+      - name: Count 24-hour truck-designated sites by country
+        run: |
+          python3 - <<'PY'
+          import urllib.request,json,collections,re
+          r=urllib.request.urlopen(urllib.request.Request('https://restareaseurope.com/downloads/rest-areas-europe.geojson',headers={'User-Agent':'Mozilla/5.0'}),timeout=80)
+          d=json.load(r)
+          allh=collections.Counter()
+          match=[]
+          for x in d['features']:
+            p=x['properties']
+            if p.get('amenities',{}).get('truck_parking') is not True:continue
+            h=str(p.get('openingHours',''))
+            if h:allh[h]+=1
+            if re.search(r'(?:^24/7$|Mo-Su\\s*00:00-24:00|24:00-24:00)',h,re.I):
+              match.append(x)
+          print('OPENING_HOURS_DISTINCT',len(allh),'POPULAR',allh.most_common(20))
+          print('24H_TRUCK_PARKING_TOTAL',len(match),'COUNTRIES',collections.Counter(x['properties']['country'] for x in match).most_common(30))
+          for x in [i for i in match if i['properties']['country'] == 'NL'][:14]:print('24H_NL_SAMPLE',str(x)[:600])
+          PY
