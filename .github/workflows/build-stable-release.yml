@@ -126,14 +126,34 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "${TRUCKSPOT_KEYSTORE_B64:-}" ] || [ -z "${TRUCKSPOT_SIGNING_STORE_PASSWORD:-}" ] || [ -z "${TRUCKSPOT_SIGNING_KEY_ALIAS:-}" ] || [ -z "${TRUCKSPOT_SIGNING_KEY_PASSWORD:-}" ]; then
-            echo "::error::Vaste ondertekening nog niet ingesteld. Configureer de vier TRUCKSPOT_ repository secrets, zie docs/VASTE_ANDROID_UPDATES.md"
+          for name in TRUCKSPOT_KEYSTORE_B64 TRUCKSPOT_SIGNING_STORE_PASSWORD TRUCKSPOT_SIGNING_KEY_ALIAS TRUCKSPOT_SIGNING_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Vereiste GitHub secret ontbreekt: $name"
+              exit 1
+            fi
+          done
+          echo "Alle vier beveiligde GitHub secrets zijn beschikbaar."
+          if ! printf '%s' "$TRUCKSPOT_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/truckspot-stable.jks"; then
+            echo "::error::De base64-waarde is onjuist. Controleer TRUCKSPOT_KEYSTORE_B64."
             exit 1
           fi
-          echo "${TRUCKSPOT_KEYSTORE_B64}" | base64 --decode > "$RUNNER_TEMP/truckspot-stable.jks"
           chmod 600 "$RUNNER_TEMP/truckspot-stable.jks"
+          if [ ! -s "$RUNNER_TEMP/truckspot-stable.jks" ]; then
+            echo "::error::Leeg sleutelbestand in GitHub secret."
+            exit 1
+          fi
+          echo "Sleutelbestand veilig gedecodeerd (geen sleutelinhoud weergegeven)."
+          if ! keytool -list -keystore "$RUNNER_TEMP/truckspot-stable.jks" -storepass "$TRUCKSPOT_SIGNING_STORE_PASSWORD" >/dev/null 2>&1; then
+            echo "::error::Het keystorewachtwoord is onjuist of het JKS-bestand is beschadigd."
+            exit 1
+          fi
+          echo "Keystorewachtwoord is geldig."
+          if ! keytool -list -keystore "$RUNNER_TEMP/truckspot-stable.jks" -storepass "$TRUCKSPOT_SIGNING_STORE_PASSWORD" -alias "$TRUCKSPOT_SIGNING_KEY_ALIAS" >/dev/null 2>&1; then
+            echo "::error::De sleutelalias bestaat niet in de keystore. Controleer TRUCKSPOT_KEY_ALIAS."
+            exit 1
+          fi
+          echo "Ondertekeningsalias is geldig."
           echo "TRUCKSPOT_SIGNING_STORE_FILE=$RUNNER_TEMP/truckspot-stable.jks" >> "$GITHUB_ENV"
-          keytool -list -keystore "$RUNNER_TEMP/truckspot-stable.jks" -storepass "$TRUCKSPOT_SIGNING_STORE_PASSWORD" -alias "$TRUCKSPOT_SIGNING_KEY_ALIAS" >/dev/null
           python3 - <<'PY'
           import os, re
           from pathlib import Path
