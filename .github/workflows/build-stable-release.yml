@@ -1,0 +1,189 @@
+name: Stable signed TruckSpot APK — one app icon
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: "Versie, bv. 1.0.0 (verhoog bij elke publicatie)"
+        required: true
+        default: "1.0.0"
+        type: string
+      version_code:
+        description: "Versienummer hoger dan vorige build, bv. 100"
+        required: true
+        default: "100"
+        type: string
+permissions:
+  contents: write
+jobs:
+  signed_release:
+    runs-on: ubuntu-latest
+    env:
+      TRUCKSPOT_SIGNING_STORE_PASSWORD: ${{ secrets.TRUCKSPOT_KEYSTORE_PASSWORD }}
+      TRUCKSPOT_SIGNING_KEY_ALIAS: ${{ secrets.TRUCKSPOT_KEY_ALIAS }}
+      TRUCKSPOT_SIGNING_KEY_PASSWORD: ${{ secrets.TRUCKSPOT_KEY_PASSWORD }}
+      TRUCKSPOT_KEYSTORE_B64: ${{ secrets.TRUCKSPOT_KEYSTORE_B64 }}
+    steps:
+      - name: Broncode ophalen
+        uses: actions/checkout@v4
+      - name: Java installeren
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android SDK 35 installeren
+        shell: bash
+        run: |
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
+      - name: Gradle installeren
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Ingebouwde V17-test-kaart en icoon gereedmaken
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets/web/vendor app/src/main/res/drawable
+          test -s app/src/main/assets/web/index.html
+          if [ ! -s app/src/main/assets/web/vendor/leaflet.js ]; then
+            curl --fail --location --retry 3 \
+              'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js' \
+              --output app/src/main/assets/web/vendor/leaflet.js
+          fi
+          if [ ! -s app/src/main/assets/web/vendor/leaflet.css ]; then
+            curl --fail --location --retry 3 \
+              'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css' \
+              --output app/src/main/assets/web/vendor/leaflet.css
+          fi
+          if [ ! -s app/src/main/res/drawable/truckspot_branded_icon.png ]; then
+            python3 - <<'PY'
+          import base64,re
+          from pathlib import Path
+          s=Path('app/src/main/assets/web/index.html').read_text()
+          m=re.search(r'data:image/png;base64,([A-Za-z0-9+/=]+)',s)
+          assert m, "Logo ontbreekt"
+          Path('app/src/main/res/drawable/truckspot_branded_icon.png').write_bytes(base64.b64decode(m.group(1)))
+          PY
+          fi
+          test -s app/src/main/res/drawable/truckspot_branded_icon.png
+          grep -q './vendor/leaflet.js' app/src/main/assets/web/index.html
+          grep -q 'navigator.geolocation' app/src/main/assets/web/index.html
+          node --version
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('app/src/main/assets/web/index.html').read_text()
+          parts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S|re.I)
+          Path('/tmp/truckspot-inline.js').write_text('\n'.join(parts))
+          PY
+          node --check /tmp/truckspot-inline.js
+          node --check app/src/main/assets/web/own-parking.js
+          node --check app/src/main/assets/web/shared-parking.js
+          python3 - <<'PY'
+          import json
+          p='app/src/main/assets/web/shared-config.json'
+          d=json.load(open(p))
+          assert d['url'].startswith('https://') and d['publishableKey'].startswith('sb_publishable_'), 'Supabase publishable config invalid'
+          print('Supabase public client configuration validated')
+          PY
+          echo "TruckSpot UI is opgeslagen in de APK; Netlify is niet nodig."
+      - name: Europees vrachtwagenparkeerbestand in de APK opnemen
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets/web/data
+          if [ ! -s app/src/main/assets/web/data/truckparkings.json ]; then
+            curl --fail --retry 2 --retry-delay 2 --connect-timeout 10 --max-time 90 --location \
+              'https://zenodo.org/records/14643147/files/truckParkingLocationsEurope_N13323_v04.csv?download=1' \
+              -o /tmp/truckParkingLocationsEurope_N13323_v04.csv
+            python3 scripts/build_parking_catalog.py \
+              /tmp/truckParkingLocationsEurope_N13323_v04.csv \
+              app/src/main/assets/web/data/truckparkings.json
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add app/src/main/assets/web/data/truckparkings.json
+            git commit -m "Snapshot Fraunhofer 2025 European truck parking coordinates (CC BY 4.0)" || true
+            git push origin HEAD:main || true
+          fi
+          python3 - <<'PY'
+          import json
+          p='app/src/main/assets/web/data/truckparkings.json'
+          d=json.load(open(p))
+          assert len(d['spots'])>=12000, "Parking data invalid or missing"
+          print('TRUCK_PARKING_DATASET:',len(d['spots']),'Europe locations embedded')
+          PY
+
+      - name: APK met vaste pakketnaam en eigen ondertekening voorbereiden
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ inputs.version_code }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${TRUCKSPOT_KEYSTORE_B64:-}" ] || [ -z "${TRUCKSPOT_SIGNING_STORE_PASSWORD:-}" ] || [ -z "${TRUCKSPOT_SIGNING_KEY_ALIAS:-}" ] || [ -z "${TRUCKSPOT_SIGNING_KEY_PASSWORD:-}" ]; then
+            echo "::error::Vaste ondertekening nog niet ingesteld. Configureer de vier TRUCKSPOT_ repository secrets, zie docs/VASTE_ANDROID_UPDATES.md"
+            exit 1
+          fi
+          echo "${TRUCKSPOT_KEYSTORE_B64}" | base64 --decode > "$RUNNER_TEMP/truckspot-stable.jks"
+          chmod 600 "$RUNNER_TEMP/truckspot-stable.jks"
+          echo "TRUCKSPOT_SIGNING_STORE_FILE=$RUNNER_TEMP/truckspot-stable.jks" >> "$GITHUB_ENV"
+          keytool -list -keystore "$RUNNER_TEMP/truckspot-stable.jks" -storepass "$TRUCKSPOT_SIGNING_STORE_PASSWORD" -alias "$TRUCKSPOT_SIGNING_KEY_ALIAS" >/dev/null
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          s=Path('app/build.gradle').read_text()
+          code=os.environ["VERSION_CODE"]
+          name=os.environ["VERSION_NAME"]
+          assert code.isdigit() and 1 <= int(code) <= 2**31-1, "Ongeldige versionCode"
+          assert re.fullmatch(r'[0-9]+(?:\.[0-9]+){0,3}', name), "Ongeldige versie"
+          s,n=re.subn(r"applicationId\s+'[^']+'", "applicationId 'eu.truckspot.europe.stable'",s,count=1); assert n==1
+          s,n=re.subn(r"versionCode\s+[0-9]+",f"versionCode {code}",s,count=1); assert n==1
+          s,n=re.subn(r"versionName\s+'[^']+'",f"versionName '{name}'",s,count=1); assert n==1
+          s+="""
+          android {
+              signingConfigs {
+                  truckspotStable {
+                      storeFile file(System.getenv('TRUCKSPOT_SIGNING_STORE_FILE'))
+                      storePassword System.getenv('TRUCKSPOT_SIGNING_STORE_PASSWORD')
+                      keyAlias System.getenv('TRUCKSPOT_SIGNING_KEY_ALIAS')
+                      keyPassword System.getenv('TRUCKSPOT_SIGNING_KEY_PASSWORD')
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.truckspotStable
+                  }
+              }
+          }
+          """
+          Path('app/build.gradle').write_text(s)
+          print('Stable Android app-ID and signing configuration injected.')
+          PY
+      - name: Ondertekende APK compileren
+        run: gradle --no-daemon --stacktrace :app:assembleRelease
+      - name: Handtekening en versie controleren
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/release/app-release.apk
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -E "package: name='eu.truckspot.europe.stable'"
+          cp "$apk" TruckSpot-Europe-Stable-Signed.apk
+      - name: APK als download publiceren
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: stable-v${{ inputs.version_name }}
+          name: TruckSpot Europe Stable v${{ inputs.version_name }}
+          body: |
+            Dit is de stabiel ondertekende APK. Dit is een nieuwe installatie t.o.v. oude debug-testapps.
+            Elke volgende APK uit deze workflow kan deze app bijwerken wanneer dezelfde repository secrets
+            en Android app-ID eu.truckspot.europe.stable worden gebruikt met een hogere versionCode.
+            Backup van eigen lokale gegevens vereist vóór verwijdering van oude testapps.
+          files: TruckSpot-Europe-Stable-Signed.apk
+          prerelease: true
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
