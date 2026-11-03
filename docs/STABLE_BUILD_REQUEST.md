@@ -1,15 +1,31 @@
-# TruckSpot Europe 1.0.3 — automatisch laden en eigen correcties voor nachtparkeren
+# TruckSpot Europe 1.0.4 — chauffeurscorrecties samen delen na beoordeling
 
-Deze update bouwt voort op versie 1.0.2 en gebruikt dezelfde Android-pakketnaam en beveiligde ondertekening, zodat een bestaande installatie over versie 1.0.2 kan worden bijgewerkt. Verwijder de app niet: favorieten en eigen locaties zijn uitsluitend lokaal opgeslagen.
+Deze update gebruikt dezelfde Android-app-ID (`eu.truckspot.europe.stable`) en dezelfde ondertekening als 1.0.3. **Bijwerken, niet verwijderen**: eigen parkeerplaatsen, favorieten en bestaande lokale correcties blijven dan op de Samsung staan.
 
-## Verbeteringen
-- De ingebouwde Europese lijst wordt automatisch bijgewerkt bij verplaatsen van de kaart. Bij uitzoomen worden alle gevonden vermeldingen in het kaartgebied bekeken, zonder de oude beperking tot de 350 dichtstbijzijnde locaties.
-- Drukke gebieden worden met aantallen gegroepeerd; tik om in te zoomen, of kies afzonderlijke locaties bij maximale zoom.
-- De lijst onder de kaart toont maximaal 160 resultaten voor betere prestaties op de telefoon; de kaart toont alle beschikbare groepen.
-- Bij **Details → Nachtparkeren aanpassen** kan de chauffeur zelf aangeven of overnachten volgens eigen controle wel of niet mag en een bron of uitleg noteren. Het vereist bevestiging dat de chauffeur veilig stilstaat.
-- De correctie wordt bewaard op de telefoon onder `ts103_parking_corrections` en is duidelijk herkenbaar als **eigen, niet onafhankelijk bevestigde informatie**. Er worden geen openbare wijzigingen aan de brondata of Supabase-database gedaan.
+## Wat is nieuw?
+- Bestaande parkeerplaats: open **Details → Nachtparkeren aanpassen**, kies ja/nee, vul een gecontroleerde toelichting in en bewaar de wijziging lokaal.
+- Open de details opnieuw en kies **🌍 Correctie insturen voor controle**. De gebruiker bevestigt expliciet dat locatie en toelichting na goedkeuring openbaar kunnen worden.
+- Gedeelde chauffeurcorrecties worden in een afzonderlijke Supabase-tabel `truckspot_parking_corrections` opgeslagen als `pending`, nooit meteen als bevestigd. Alleen bevoegde databasebeheerders kunnen een rij goedkeuren of afwijzen.
+- De app haalt goedgekeurde correcties op, toont ze als **beoordeelde chauffeursmeldingen, niet als officiële toestemming** en blijft bronbevestigde nachtparking onderscheiden van meningen van chauffeurs.
+- De eigen lokale correctie heeft altijd een afzonderlijke aanduiding. Insturen gebeurt niet automatisch.
+- De bestaande gedeelde parkingfunctie en ingebouwde Europese kaart blijven actief.
 
-## Grenzen
-De Europese bron omvat aangeduide truckparkings, niet alle vrachtwagenparkeerplekken. Onvolledige geografische dekking blijft mogelijk. Nachtparkeren is pas bronbevestigd waar de app die status onafhankelijk aangeeft; een chauffeurcorrectie vervangt dit niet. Nederlandse snelwegverzorgingsplaatsen mogen niet zonder meer als overnachtingsplek worden beschouwd.
+## Veiligheid en privacy
+- Geen geheime server- of beheerder-API-sleutels in de APK; alleen de publieke Supabase-clientconfiguratie.
+- Row Level Security laat alleen `approved` chauffeurmeldingen uitlezen. Aanmaken is beperkt tot ingelogde chauffeurs met `pending` status; geen gebruiker mag zelf `approved` publiceren.
+- De database bewaart een anonieme auteursaanduiding, die niet voor de publieke app uitleesbaar is; maximaal vijf correcties per account per 24 uur.
+- Gebruik geen persoonsgegevens in de toelichting. Eerdere inzendingen kunnen niet worden ingetrokken door de lokale correctie te verwijderen.
+- De status van nachtparkeren blijft afhankelijk van de lokale borden en de bevoegde beheerder. De app geeft geen juridische garantie en geen actuele bezetting.
 
-Versie: **1.0.3**, versionCode **103**, Android-pakket **eu.truckspot.europe.stable**.
+## Moderatie
+Nieuwe meldingen kunnen met beheerderstoegang worden bekeken via:
+`select id, source_spot_id, spot_name, overnight, evidence, status, created_at from public.truckspot_parking_corrections where status='pending' order by created_at;`
+
+Na controle van de bron:
+`update public.truckspot_parking_corrections set status='approved',reviewed_at=now() where id='<gecontroleerd-id>';`
+
+Bij twijfel: `status='rejected'`, of laat `pending` staan. Een goedgekeurde chauffeurmelding is nog steeds geen operatorbevestiging.
+
+Bijbehorende SQL: `supabase/migrations/20261103_driver_overnight_corrections.sql`. De migratie is op het project toegepast voordat deze stabiele build gepubliceerd wordt.
+
+Versie: **1.0.4**, versionCode **104**, Android-pakket **eu.truckspot.europe.stable**.
