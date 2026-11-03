@@ -1,25 +1,32 @@
-# TruckSpot Europe 1.0.7 — beveiligde registratie voor het beheerdersaccount
+# TruckSpot Europe 1.0.8 — overzicht van alle beoordelingen en compact scherm
 
-Dit is de opvolger van de stabiele versie 1.0.6. App-ID blijft `eu.truckspot.europe.stable` en APK wordt met dezelfde beveiligde Android-keystore ondertekend. Update over 1.0.5 of 1.0.6, verwijder de app niet.
+Zelfde Android pakket `eu.truckspot.europe.stable`, versie 1.0.8 (versionCode 108). Installeer als **Bijwerken** over 1.0.7. De app niet verwijderen: favorieten, lokale nachtparkeercorrecties en eigen parkings blijven lokaal.
 
-## Nieuwe functie
-- Bij **🔒 Beheer** (bovenaan, direct onder het logo) kun je je aanmelden met e-mail/wachtwoord of kiezen voor **📧 Beheeraccount aanmaken**.
-- Het registratiescherm controleert e-mailadres, bevestigt het nieuwe wachtwoord (minimaal twaalf tekens), vraagt de gebruiker te bevestigen dat hij/zij veilig stilstaat, en stuurt registratie rechtstreeks via HTTPS naar Supabase Auth.
-- Wachtwoorden worden niet opgeslagen in app-instellingen, lokale opslag, logs of broncode. Het beheerders-inlogtoken zit alleen tijdelijk in het appgeheugen.
-- Registratie alleen verleent **NOOIT beheerdersrechten**. Nadat de gebruiker zijn e-mailadres via de Supabase-bevestigingsmail heeft bevestigd, moet de projectbeheerder het bestaande **niet-anonieme** account expliciet autoriseren door `auth.users.raw_app_meta_data.truckspot_moderator = true` te zetten met vertrouwde beheertoegang. De RLS-beveiliging van 1.0.5 vereist deze server-side vlag én een niet-anoniem account.
-- Zonder deze handmatige autorisatie kan de gebruiker wel registreren, maar *niet* parkeerplaatsen goedkeuren; de app meldt dat duidelijk.
-- Geen automatische goedkeuring van chauffeursmeldingen.
+## Beheer, duidelijk en compact
+- Het beveiligde scherm **🔒 Beheer** toont drie tabbladen: **⏳ Wachtend**, **✅ Goedgekeurd** en **❌ Afgewezen**.
+- Standaard zie je **Wachtend** met goedkeuren/afwijzen. Na een beslissing verdwijnt de melding uit Wachtend, maar blijft staan in het tabblad Goedgekeurd of Afgewezen.
+- De twee geschiedenisoverzichten zijn alleen-lezen: oude beoordelingen kunnen in deze versie niet opnieuw worden aangepast.
+- Elk tabblad laat maximaal 80 correcties en 80 toegevoegde parkeerplaatsen zien (recentste eerst in het archief); de beheerder kan het overzicht handmatig vernieuwen.
+- Het scherm is korter: tabs, een samenvattende regel, alleen relevante rubrieken en één toolbar in plaats van dubbele knoppen.
+- Toegang blijft alleen voor geautoriseerde, **niet-anonieme** moderatoraccounts; de bestaande Supabase RLS wordt niet verslapt.
+- Er is **geen automatische goedkeuring**, en het registratiescherm uit v1.0.7 blijft bestaan.
 
-## Bewaarde verbeteringen uit 1.0.6
-- **🔒 Beheer** staat bovenaan.
-- De oude tekst **V5 • GPS TEST** is volledig verwijderd, zonder nieuwe versiebadge.
-- De kaartstatus/telling staat niet langer zichtbaar over de +/−-zoomknoppen en blijft toegankelijk als schermlezerstatus.
+## Nachtparkeren direct herkennen
+- Bij de kaart-pins, detailkaarten en parkeerplaatskaarten tonen we voortaan expliciet:
+  - **✅ Nachtparkeren: JA · bronbevestigd** waar een gecontroleerde bron aanwezig is.
+  - **🌙 Nachtparkeren: JA volgens chauffeur · niet officieel bevestigd** wanneer alleen een goedgekeurde chauffeursmelding dit ondersteunt.
+  - **⛔ Nachtparkeren: NEE volgens chauffeur** bij een beoordeelde negatieve melding.
+  - **🌙 Nachtparkeren: niet bevestigd** als officiële nachttoestemming niet bekend is.
+- Een goedgekeurde chauffeursmelding blijft een melding, geen juridische toestemming. Lees nog steeds de verkeersborden, tijdslimiet en plaatselijke regels.
+- Eerdere Nederlandse snelwegverzorgingsplaatsen behouden de tekst dat de nachtregels ter plaatse gecontroleerd moeten worden; de 24-uurslimiet is niet overal standaard.
 
-## Testplan
-1. Installeer 1.0.7 over de bestaande app en controleer dat favorieten en zelftoegevoegde plekken er nog zijn.
-2. Open Beheer → Beheeraccount aanmaken; controleer de invoervalidatie en dat de app na registratie om e-mailbevestiging en aparte activatie vraagt.
-3. Verifieer dat onbevoegde of anonieme chauffeurs het beheerdersscherm niet kunnen openen of pending inzendingen kunnen goedkeuren.
-4. Activeer afzonderlijk een bevestigd, niet-anoniem Auth-account voor beheer en controleer dan de reviewfunctie met een echte beheerlogin.
-5. Test de kaartzoomknoppen zonder de oude, grote status-overlay.
+## Beknopter op je Samsung
+- Verkorte introductietekst boven de kaart.
+- GPS-status begint met een korte aanwijzing.
+- De zeven hoofdknoppen nemen op smalle schermen slechts drie compacte rijen in.
+- De eerder weggehaalde V5-testbadge en grote status-overlay komen niet terug. De zoomknoppen blijven vrij.
 
-Versie: **1.0.7**, versionCode **107**, Android package **eu.truckspot.europe.stable**.
+## Uitvoer
+De bestaande GitHub Actions signing workflow bouwt de gesigneerde stable APK met dezelfde app-id en keystore. Extra JavaScript-broncheck bestaat al voor `admin-parking.js`.
+
+Versie: **1.0.8**, versionCode **108**, package **eu.truckspot.europe.stable**.
