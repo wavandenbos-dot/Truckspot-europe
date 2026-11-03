@@ -1,6 +1,6 @@
 'use strict';
 /*
- * TruckSpot Europe 1.0.5 – moderator dashboard.
+ * TruckSpot Europe 1.0.7 – moderator dashboard and secure admin account registration.
  * Deliberately uses a separate, short-lived, IN-MEMORY admin session.
  * No moderator identity, password, API service key or role is ever hardcoded.
  * All write decisions are enforced in the Supabase database by RLS.
@@ -26,7 +26,7 @@
  function loginScreen(info=''){
   showSheet('🔒 TruckSpot beheer',`
    <p>Alleen voor gemachtigde beheerders. Chauffeurs kunnen geen meldingen zelf goedkeuren.</p>
-   <p class="hint">Beheerdersaccount moet vooraf via Supabase Auth worden aangemaakt en geautoriseerd. Een normaal of anoniem chauffeuraccount geeft geen toegang.</p>
+   <p class="hint">Gebruik je eigen e-mail en wachtwoord. Een nieuw account heeft nog geen beheerdersrechten: die worden afzonderlijk en handmatig geactiveerd.</p>
    <label for="admin-email">Beheerder e-mail
      <input class="wide" id="admin-email" type="email" inputmode="email" autocomplete="username" maxlength="200" required placeholder="e-mailadres"></label>
    <label for="admin-password">Wachtwoord
@@ -34,8 +34,57 @@
    <label class="check"><input id="admin-stopped" type="checkbox"> Ik sta veilig stil en kan de gegevens zorgvuldig controleren.</label>
    <p id="admin-feedback" class="hint" role="status" aria-live="polite">${safe(info)}</p>
    <button class="btn primary wide" data-admin="login">🔐 Aanmelden als beheerder</button>
+   <button class="btn wide" data-admin="create-account">📧 Beheeraccount aanmaken</button>
    <p class="hint">Je wachtwoord wordt nooit opgeslagen door TruckSpot. Na sluiten van de app moet je opnieuw inloggen.</p>
   `);
+ }
+function registrationScreen(info=''){
+  showSheet('📧 Beheeraccount aanmaken',`
+   <p>Maak een persoonlijk account aan voor toegang tot het TruckSpot-beheer.</p>
+   <p class="hint"><b>Let op:</b> registreren geeft nog geen beheerdersrechten. De eigenaar moet je account na e-mailbevestiging apart activeren. Chauffeurs kunnen geen beheerder worden door zich alleen aan te melden.</p>
+   <label for="admin-register-email">E-mailadres
+     <input class="wide" id="admin-register-email" type="email" inputmode="email" autocomplete="email" maxlength="200" placeholder="jij@voorbeeld.nl" required></label>
+   <label for="admin-register-password">Nieuw wachtwoord (minimaal 12 tekens)
+     <input class="wide" id="admin-register-password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+   <label for="admin-register-confirm">Wachtwoord herhalen
+     <input class="wide" id="admin-register-confirm" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+   <label class="check"><input id="admin-register-stopped" type="checkbox"> Ik sta veilig stil en bevestig dat ik dit account zelf aanmaak.</label>
+   <p id="admin-feedback" class="hint" role="status" aria-live="polite">${safe(info)}</p>
+   <button class="btn primary wide" data-admin="register">✅ Account aanmaken</button>
+   <button class="btn wide" data-admin="back-login">↩ Terug naar inloggen</button>
+   <p class="hint">Je wachtwoord gaat rechtstreeks via een beveiligde HTTPS-verbinding naar Supabase Auth en wordt niet in TruckSpot opgeslagen.</p>
+  `);
+ }
+ async function registerAccount(){
+  if(working)return;
+  if(!document.getElementById('admin-register-stopped')?.checked)return status('Bevestig dat je veilig stilstaat.');
+  const email=(document.getElementById('admin-register-email')?.value||'').trim();
+  const pw=document.getElementById('admin-register-password')?.value||'';
+  const again=document.getElementById('admin-register-confirm')?.value||'';
+  if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)||email.length>200)return status('Vul een geldig e-mailadres in.');
+  if(pw.length<12||pw.length>128)return status('Kies een wachtwoord van minstens 12 en maximaal 128 tekens.');
+  if(pw!==again)return status('De twee wachtwoorden zijn niet gelijk.');
+  working=true;status('Beveiligd account aanmaken…');
+  try{
+   const c=await config();
+   const r=await fetch(c.url+'/auth/v1/signup',{
+    method:'POST',
+    headers:{'apikey':c.publishableKey,'Content-Type':'application/json','Accept':'application/json'},
+    body:JSON.stringify({email,password:pw}),cache:'no-store'
+   });
+   if(!r.ok){
+    let message='Registreren is niet gelukt.';
+    try{const d=await r.json();if(r.status===429)message='Te veel pogingen. Probeer later opnieuw.';else if(r.status===422)message=d.msg||d.message||'E-mailadres of wachtwoord geweigerd.';else if(r.status===400)message=d.msg||d.message||message}catch{}
+    throw Error(message);
+   }
+   showSheet('✅ Account aangevraagd',`
+    <p>Je registratie is verstuurd voor <b>${safe(email)}</b>.</p>
+    <p><b>Controleer je e-mail</b> op een bevestigingslink (ook in de spamfolder). Heb je al een account, gebruik dan de inlogknop.</p>
+    <p class="callout">🔒 Dit account is <b>nog niet bevoegd</b> om parkings goed te keuren. Na je bevestiging moet de TruckSpot-eigenaar de beheerdersrechten afzonderlijk activeren. Dat gaat nooit automatisch.</p>
+    <button class="btn primary wide" data-admin="back-login">🔐 Naar inloggen</button>
+    <p class="hint">Deel nooit je wachtwoord of bevestigingslink met anderen.</p>`);
+  }catch(e){status(String(e.message||'Account aanmaken mislukt'))}
+  finally{working=false}
  }
  function status(msg){const e=document.getElementById('admin-feedback');if(e)e.textContent=msg}
  async function signIn(){
@@ -163,6 +212,9 @@
   const b=e.target.closest('button[data-admin]');if(!b)return;
   const action=b.dataset.admin;
   if(action==='login')signIn();
+  else if(action==='create-account')registrationScreen();
+  else if(action==='register')registerAccount();
+  else if(action==='back-login')loginScreen();
   else if(action==='logout'){forget();hideSheet();tell('Beheerderssessie afgesloten')}
   else if(action==='refresh')loadQueue();
   else if(['approve-correction','reject-correction','approve-parking','reject-parking'].includes(action))moderate(action,b.dataset.id);
