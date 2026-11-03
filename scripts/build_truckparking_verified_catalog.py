@@ -26,14 +26,14 @@ NDW_URL = "https://opendata.ndw.nu/Truckparking_Parking_Table.xml"
 CURATED = [
     ["nl-rogaat-raket",52.68660,6.26859,"Wegrestaurant De Raket · Truckparking","NL","v","A28 afrit 24",False,15,
      "https://wegrestaurantderaket.nl/truck-parkeren/",1],
-    ["nl-emmen-routiers",52.74079,6.96603,"Routiers Emmen · Beveiligde truckparking","NL","v","A37 · bedrijventerrein",True,13,
+    ["nl-emmen-routiers",52.74079,6.96603,"Emmen · bewaakte truckparking (Edisonstraat)","NL","v","A37 · bedrijventerrein",True,13,
      "https://www.truckstar.nl/overzicht-bewaakte-parkeerplaatsen-in-nederland/",1],
     ["nl-venlo-truckparking",51.391284,6.099148,"Truck Parking Venlo · Tradeport West","NL","v","A67 / A73",True,15,
      "https://truckparkingvenlo.nl/",1],
     ["nl-asten-truckinn",51.41656,5.75729,"Truck-Inn Nobis Asten · Truckparking","NL","v","A67 afrit 36",True,7,
      "https://www.truckstop.nl/parkeren/",1],
-    ["nl-deurningen-frans",52.28498,6.85336,"Frans op den Bult · Bewaakte truckstop","NL","v","A1 afrit 31",False,15,
-     "https://fransopdenbult.nl/truckstop/",0],
+    ["nl-deurningen-frans",52.28498,6.85336,"Frans op den Bult · Bewaakte truckstop","NL","v","A1 afrit 31",True,15,
+     "https://fransopdenbult.nl/truckstop/",1],
     ["nl-maasvlakte-plaza",51.92976,4.02093,"Truckparking Maasvlakte Plaza","NL","v","A15 · haven / industrieterrein",True,15,
      "https://www.portofrotterdam.com/nl/logistiek/verbindingen/intermodaal-transport/wegtransport/maasvlakte-plaza-truckparking",1],
 ]
