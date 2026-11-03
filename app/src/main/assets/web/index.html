@@ -61,7 +61,7 @@ function distance(a,b){let rad=x=>x*Math.PI/180,dLat=rad(b.lat-a.lat),dLng=rad(b
 function has(t,k){return /^(yes|designated|official|true|1)$/i.test(t[k]||'')}
 function sourceParking(el){let t=el.tags||{},point=el.type==='node'?el:el.center;if(!point||!Number.isFinite(point.lat)||!Number.isFinite(point.lon))return null;
 if(/^(no|private|agricultural|delivery|forestry)$/i.test(t.hgv||'')||/^(private|no)$/i.test(t.access||''))return null;
-const truck=has(t,'hgv')||Number(t['capacity:hgv'])>0||Number(t['capacity:truck'])>0||/\b(truck|lkw|autohof|camion|vrachtwagen|tir\s*park|camiones)\b/i.test(t.name||'');
+const truck=has(t,'hgv')||Number(t['capacity:hgv'])>0||Number(t['capacity:truck'])>0||['hgv:overnight','overnight:hgv','overnight_parking:hgv','parking:overnight:hgv'].some(k=>/^(yes|designated|official|allowed|permitted)$/i.test(t[k]||''))||/\b(truck|lkw|autohof|camion|vrachtwagen|tir\s*park|camiones)\b/i.test(t.name||'');
 const rest=t.highway==='rest_area'||t.highway==='services';
 const sec=has(t,'supervised')||has(t,'surveillance')||has(t,'fenced')||t.surveillance==='camera'||has(t,'security');
 const fee=/^yes$/i.test(t.fee||'')?'paid':/^no$/i.test(t.fee||'')?'free':'unknown';
@@ -182,7 +182,7 @@ function fromOsm(json) {
     const spot=sourceParking(element);
     if(spot) seen.set(spot.id,spot);
   }
-  return [...seen.values()].slice(0,MAX_RESULTS);
+  return [...seen.values()].filter(truckOvernightAllowed).slice(0,MAX_RESULTS);
 }
 function showParkingResults(spots, label, mode='map') {
   state.searchAttempted=true;state.searchError='';
@@ -200,17 +200,12 @@ function showParkingResults(spots, label, mode='map') {
 }
 function fallbackQuery(path){
  const p=new URL(path,window.location.origin).searchParams;
- const area=p.has('bbox')?'('+p.get('bbox')+')':'(around:'+Math.round(Number(p.get('radius'))*1000)+','+Number(p.get('lat'))+','+Number(p.get('lon'))+')';
- return '[out:json][timeout:25];('+
- 'nwr["amenity"="parking"]["hgv:overnight"~"^(yes|designated|official|allowed|permitted)$"]'+area+';'+
- 'nwr["amenity"="parking"]["overnight:hgv"~"^(yes|designated|official|allowed|permitted)$"]'+area+';'+
- 'nwr["amenity"="parking"]["overnight_parking:hgv"~"^(yes|designated|official|allowed|permitted)$"]'+area+';'+
- 'nwr["amenity"="parking"]["parking:overnight:hgv"~"^(yes|designated|official|allowed|permitted)$"]'+area+';'+
- 'nwr["amenity"="parking"]["hgv"~"^(yes|designated|official)$"]'+area+';'+
- 'nwr["amenity"="parking"]["capacity:hgv"]'+area+';'+
- 'nwr["amenity"="parking"]["capacity:truck"]'+area+';'+
- 'nwr["amenity"="truck_stop"]'+area+';'+
- 'nwr["highway"~"^(rest_area|services)$"]'+area+';);out center tags 350;';
+ const area=p.has('bbox')?'('+p.get('bbox')+')':'(around:'+Math.round(Math.min(100,Math.max(5,Number(p.get('radius'))||50))*1000)+','+Number(p.get('lat'))+','+Number(p.get('lon'))+')';
+ const allowed='^(yes|designated|official|allowed|permitted)$';
+ const explicit=['hgv:overnight','overnight:hgv','overnight_parking:hgv','parking:overnight:hgv'].map(k=>'nwr["'+k+'"~"'+allowed+'",i]'+area+';').join('');
+ const other='nwr["overnight_parking"~"'+allowed+'",i]["hgv"~"^(yes|designated|official)$",i]'+area+';'
+  +'nwr["overnight_parking"~"'+allowed+'",i]["capacity:hgv"]'+area+';';
+ return '[out:json][timeout:35];('+explicit+other+');out center tags '+MAX_RESULTS+';';
 }
 async function parkingApi(path,timeoutMs=70000){
  const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),timeoutMs);
@@ -242,7 +237,7 @@ async function fetchLocations(){
   const height=distance({lat:bounds.getSouth(),lng:bounds.getWest()},{lat:bounds.getNorth(),lng:bounds.getWest()});
   const width=distance({lat:bounds.getSouth(),lng:bounds.getWest()},{lat:bounds.getSouth(),lng:bounds.getEast()});
   if(height>85||width>110){$('#mapstatus').textContent='⚠ Zoom verder in voordat je laadt (maximaal ±85×110 km)';return}
-  const key='ts9_bbox_'+bboxKey();
+  const key='ts18_bbox_'+bboxKey();
   const cached=store.get(key,null);
   if(cached&&Date.now()-cached.at<CACHE_MS){
     showParkingResults(cached.items,'uit cache','map');return;
@@ -320,7 +315,7 @@ async function loadNearMe(){
   // Only explicitly approved and overnight-confirmed truck parking is visible.
   // Do not stop after finding unverified research coordinates.
 
-  const key='ts9_gps_'+loc.lat.toFixed(2)+'_'+loc.lng.toFixed(2)+'_'+km;
+  const key='ts18_gps_'+loc.lat.toFixed(2)+'_'+loc.lng.toFixed(2)+'_'+km;
   const cached=store.get(key,null);
   if(cached&&Date.now()-cached.at<CACHE_MS){showParkingResults(cached.items,'binnen '+km+' km uit cache','gps');return}
   if(Date.now()-state.lastFetch<15000){tell('Wacht enkele seconden tussen zoekopdrachten.');return}
