@@ -9,12 +9,12 @@ on:
       version_name:
         description: "Versie, bv. 1.0.0 (verhoog bij elke publicatie)"
         required: true
-        default: "1.0.1"
+        default: "1.0.2"
         type: string
       version_code:
         description: "Versienummer hoger dan vorige build, bv. 100"
         required: true
-        default: "101"
+        default: "102"
         type: string
 permissions:
   contents: write
@@ -119,10 +119,26 @@ jobs:
           print('TRUCK_PARKING_DATASET:',len(d['spots']),'Europe locations embedded')
           PY
 
+      - name: Europese truckparkings en geverifieerde nachtparkings in APK opnemen
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/build_truckparking_verified_catalog.py
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path=Path('app/src/main/assets/web/data/truckparking-verified.json')
+          d=json.loads(path.read_text(encoding='utf8'))
+          assert d['count']>=4500 and len(d['spots'])==d['count'], "Onjuiste vrachtwagenparkings"
+          assert any(r[4]=='NL' and r[-1]==1 for r in d['spots']), "Nachtparking NL ontbreekt"
+          assert any(r[4]=='DE' for r in d['spots']), "Europese parkings ontbreken"
+          assert all(r[-1]==0 for r in d['spots'] if str(r[0]).startswith('osm-')), "OSM alleen bewijst nachtparkeren niet"
+          print('Verified catalog: %d HGV-designated spots; %d operator-confirmed overnight; %d bytes' % (d['count'],sum(r[-1]==1 for r in d['spots']),path.stat().st_size))
+          PY
       - name: APK met vaste pakketnaam en eigen ondertekening voorbereiden
         env:
-          VERSION_NAME: ${{ inputs.version_name || '1.0.1' }}
-          VERSION_CODE: ${{ inputs.version_code || '101' }}
+          VERSION_NAME: ${{ inputs.version_name || '1.0.2' }}
+          VERSION_CODE: ${{ inputs.version_code || '102' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -201,8 +217,8 @@ jobs:
       - name: APK als download publiceren
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: stable-v${{ inputs.version_name || '1.0.1' }}
-          name: TruckSpot Europe Stable v${{ inputs.version_name || '1.0.1' }}
+          tag_name: stable-v${{ inputs.version_name || '1.0.2' }}
+          name: TruckSpot Europe Stable v${{ inputs.version_name || '1.0.2' }}
           body: |
             Dit is de stabiel ondertekende APK. Dit is een nieuwe installatie t.o.v. oude debug-testapps.
             Elke volgende APK uit deze workflow kan deze app bijwerken wanneer dezelfde repository secrets
