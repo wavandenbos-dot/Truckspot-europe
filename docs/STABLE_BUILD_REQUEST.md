@@ -1,7 +1,15 @@
-# TruckSpot Europe 1.0.2 — Europese vrachtwagenparkings met aparte nachtinformatie
+# TruckSpot Europe 1.0.3 — automatisch laden en eigen correcties voor nachtparkeren
 
-Deze stabiele Android-update bevat een Europees ODbL bestand met vrachtwagenparkeerplaatsen en aparte door exploitanten of andere bronnen bevestigde nachtparkings. Langs snelwegen, bij truckstops en op industrieterreinen kunnen vrachtwagens locaties vinden. Een aanduiding "truckparking" betekent niet automatisch dat overnachten is toegestaan: daarvoor toont de app apart de bronstatus.
+Deze update bouwt voort op versie 1.0.2 en gebruikt dezelfde Android-pakketnaam en beveiligde ondertekening, zodat een bestaande installatie over versie 1.0.2 kan worden bijgewerkt. Verwijder de app niet: favorieten en eigen locaties zijn uitsluitend lokaal opgeslagen.
 
-Het originele onbevestigde Fraunhofer-onderzoeksbestand wordt niet als bewijs voor overnachting gebruikt. Nederlandse Rijkswaterstaat-verzorgingsplaatsen worden nadrukkelijk als kortere rustplekken aangeduid.
+## Verbeteringen
+- De ingebouwde Europese lijst wordt automatisch bijgewerkt bij verplaatsen van de kaart. Bij uitzoomen worden alle gevonden vermeldingen in het kaartgebied bekeken, zonder de oude beperking tot de 350 dichtstbijzijnde locaties.
+- Drukke gebieden worden met aantallen gegroepeerd; tik om in te zoomen, of kies afzonderlijke locaties bij maximale zoom.
+- De lijst onder de kaart toont maximaal 160 resultaten voor betere prestaties op de telefoon; de kaart toont alle beschikbare groepen.
+- Bij **Details → Nachtparkeren aanpassen** kan de chauffeur zelf aangeven of overnachten volgens eigen controle wel of niet mag en een bron of uitleg noteren. Het vereist bevestiging dat de chauffeur veilig stilstaat.
+- De correctie wordt bewaard op de telefoon onder `ts103_parking_corrections` en is duidelijk herkenbaar als **eigen, niet onafhankelijk bevestigde informatie**. Er worden geen openbare wijzigingen aan de brondata of Supabase-database gedaan.
 
-Versie: 1.0.2; versionCode 102; pakket blijft eu.truckspot.europe.stable; dezelfde GitHub Secrets ondertekenen de APK. Oude lokale gegevens blijven bij een Android-update behouden, mits de app niet wordt verwijderd.
+## Grenzen
+De Europese bron omvat aangeduide truckparkings, niet alle vrachtwagenparkeerplekken. Onvolledige geografische dekking blijft mogelijk. Nachtparkeren is pas bronbevestigd waar de app die status onafhankelijk aangeeft; een chauffeurcorrectie vervangt dit niet. Nederlandse snelwegverzorgingsplaatsen mogen niet zonder meer als overnachtingsplek worden beschouwd.
+
+Versie: **1.0.3**, versionCode **103**, Android-pakket **eu.truckspot.europe.stable**.
