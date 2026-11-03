@@ -163,8 +163,15 @@ for(const group of cells.values()){
  const spot=group.items[0],badgeInfo=badge(spot),cls=badgeInfo[1]||'uncertain';
  const icon=L.divIcon({className:'',html:`<div class="marker-pin ${cls} ${spot.type==='rustplaats'?'rest':''}">P</div>`,iconSize:[32,32],iconAnchor:[16,16]});
  const mark=L.marker([spot.lat,spot.lng],{icon}).addTo(state.markers);
- const c=correctionFor(spot);
- mark.bindPopup(`<strong>${ESC(spot.name)}</strong><br>${c?(c.overnight==='yes'?'🌙 Nachtparkeren volgens jou · lokaal':'⛔ Volgens jou niet toegestaan · lokaal'):spot.catalog?(spot.overnightVerified?'Nachtparkeerplaats volgens bron':'Vrachtwagenparking · nachtregels controleren'):spot.shared?'Gedeeld na controle · trucktoegang zelf checken':(spot.userAdded?'Door jou toegevoegd · niet gedeeld':(spot.truck?'HGV vermeld in bron':'Trucktoegang controleren'))}<br>${badgeInfo[0]}<br><button type="button" onclick="window.TSdetail('${spot.id}')">Details bekijken</button>`);
+ const c=correctionFor(spot),published=publicCorrectionFor(spot);
+ const nightText=published?
+  (published.overnight==='yes'?'🌙 Nachtparkeren: JA volgens chauffeur (niet officieel bevestigd)':'⛔ Nachtparkeren: NEE volgens chauffeur'):
+  c?(c.overnight==='yes'?'🌙 Nachtparkeren: JA volgens jou · lokaal':'⛔ Nachtparkeren: NEE volgens jou · lokaal'):
+  spot.catalog?(spot.overnightVerified?'✅ Nachtparkeren: JA · bevestigd in bron':'🌙 Nachtparkeren: nog niet bevestigd'):
+  spot.shared?'✅ Nachtparkeren: JA · gecontroleerde bron':
+  spot.userAdded?'🌙 Nachtparkeren: JA volgens jou · lokaal':
+  (spot.truck?'🚛 Truckparking · nachtregels controleren':'🚛 Trucktoegang controleren');
+ mark.bindPopup(`<strong>${ESC(spot.name)}</strong><br>${nightText}<br>${badgeInfo[0]}<br><button type="button" onclick="window.TSdetail('${spot.id}')">Details bekijken</button>`);
 }
 let chosen=Object.entries(state.filter).filter(([k,v])=>v).map(([k])=>({free:'gratis',paid:'betaald',toilets:'toilet',shower:'douche',food:'eten',security:'beveiliging vermeld',confirmed:'HGV vermeld',reported:'jouw melding'}[k]));$('#filterinfo').textContent=chosen.length?`Actieve filters: ${chosen.join(', ')}. Niet genoemde voorzieningen zijn onbekend, niet automatisch afwezig.`:'🚛 Blauwe P betekent vrachtwagenparkeren vermeld in bron. 🌙 Nachtparkeren alleen wanneer expliciet bevestigd. Bij andere plekken borden en nachtregels controleren; NL-verzorgingsplaatsen zijn bedoeld voor kortere rust: controleer borden, nachtregels en eventuele plaatselijke parkeertijdlimieten (bijvoorbeeld 24 uur).';
 }
