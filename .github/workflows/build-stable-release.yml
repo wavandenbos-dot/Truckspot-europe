@@ -93,18 +93,6 @@ jobs:
           print('Supabase public client configuration validated')
           PY
           echo "TruckSpot UI is opgeslagen in de APK; Netlify is niet nodig."
-      - name: Online truckovernachtingszoeken herstellen (1.0.1)
-        shell: bash
-        run: |
-          python3 scripts/patch_verified_overnight_search.py
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          s=Path('app/src/main/assets/web/index.html').read_text()
-          parts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S|re.I)
-          Path('/tmp/truckspot-patched.js').write_text('\n'.join(parts))
-          PY
-          node --check /tmp/truckspot-patched.js
       - name: Europees vrachtwagenparkeerbestand in de APK opnemen
         shell: bash
         run: |
