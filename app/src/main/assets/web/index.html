@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090e0c"><title>TruckSpot Europe · V17 | Vrachtwagenovernachting</title>
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090e0c"><title>TruckSpot Europe · V1.0.1 | Vrachtwagenovernachting</title>
 <link rel="stylesheet" href="./vendor/leaflet.css" crossorigin="anonymous">
 <style>
 :root{color-scheme:dark;--bg:#080d0b;--panel:#121c17;--panel2:#18251d;--lime:#71f42a;--lime2:#b7ffa0;--edge:#304335;--muted:#9baf9f;--text:#f2f9f2;--orange:#ffbd3a;--red:#ff6666}
@@ -202,6 +202,10 @@ function fallbackQuery(path){
  const p=new URL(path,window.location.origin).searchParams;
  const area=p.has('bbox')?'('+p.get('bbox')+')':'(around:'+Math.round(Number(p.get('radius'))*1000)+','+Number(p.get('lat'))+','+Number(p.get('lon'))+')';
  return '[out:json][timeout:25];('+
+ 'nwr["amenity"="parking"]["hgv:overnight"~"^(yes|designated|official|allowed|permitted)$"]'+area+';'+
+ 'nwr["amenity"="parking"]["overnight:hgv"~"^(yes|designated|official|allowed|permitted)$"]'+area+';'+
+ 'nwr["amenity"="parking"]["overnight_parking:hgv"~"^(yes|designated|official|allowed|permitted)$"]'+area+';'+
+ 'nwr["amenity"="parking"]["parking:overnight:hgv"~"^(yes|designated|official|allowed|permitted)$"]'+area+';'+
  'nwr["amenity"="parking"]["hgv"~"^(yes|designated|official)$"]'+area+';'+
  'nwr["amenity"="parking"]["capacity:hgv"]'+area+';'+
  'nwr["amenity"="parking"]["capacity:truck"]'+area+';'+
@@ -232,16 +236,8 @@ async function fetchLocations(){
   if(state.pending||!state.map)return;
   
   const bounds=state.map.getBounds();
-  try {
-    $('#mapstatus').textContent='📚 Parkeerlocaties in dit kaartgebied doorzoeken…';
-    const local=await catalogMap(bounds);
-    showParkingResults(local,'in kaartgebied · onderzoeksdata 2025','map');
-    $('#mapstatus').textContent='🌙 '+local.filter(truckOvernightAllowed).length+' geverifieerde overnachtingsplekken · '+local.length+' onbevestigde locaties verborgen';
-    return;
-  } catch(localError){
-    console.warn('Lokaal parkeerbestand kon niet worden geopend:',localError);
-    $('#mapstatus').textContent='⚠ Lokaal bestand ontbreekt; online bron proberen…';
-  }
+  // V1.0.1: the local Fraunhofer research catalog cannot verify overnight permission.
+  // Search the online parking source instead of returning an empty confirmed list.
 
   const height=distance({lat:bounds.getSouth(),lng:bounds.getWest()},{lat:bounds.getNorth(),lng:bounds.getWest()});
   const width=distance({lat:bounds.getSouth(),lng:bounds.getWest()},{lat:bounds.getSouth(),lng:bounds.getEast()});
@@ -321,18 +317,9 @@ async function loadNearMe(){
   const km=(state.radiusKm===10||state.radiusKm===25||state.radiusKm===50||state.radiusKm===100)?state.radiusKm:50;
   state.map.panTo([loc.lat,loc.lng],{animate:false});
   state.autoParkingRequested=true;
-  // Use the built-in 2025 European research catalog first; no network timeout.
-  try {
-    $('#mapstatus').textContent='📚 Europese parkeerlocaties op je telefoon doorzoeken…';
-    const local=await catalogNear(loc.lat,loc.lng,km);
-    state.searchAttempted=true;
-    showParkingResults(local,'binnen '+km+' km · onderzoeksdata 2025','gps');
-    $('#mapstatus').textContent='🌙 '+local.filter(truckOvernightAllowed).length+' geverifieerde overnachtingsplekken · '+local.length+' onbevestigde locaties verborgen';
-    return;
-  }catch(localError){
-    console.warn('Lokaal Europees parkeerbestand ontbreekt:',localError);
-    $('#mapstatus').textContent='⚠ Lokaal bestand ontbreekt; online parkeerbron proberen…';
-  }
+  // Only explicitly approved and overnight-confirmed truck parking is visible.
+  // Do not stop after finding unverified research coordinates.
+
   const key='ts9_gps_'+loc.lat.toFixed(2)+'_'+loc.lng.toFixed(2)+'_'+km;
   const cached=store.get(key,null);
   if(cached&&Date.now()-cached.at<CACHE_MS){showParkingResults(cached.items,'binnen '+km+' km uit cache','gps');return}
