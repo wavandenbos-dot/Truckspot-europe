@@ -88,3 +88,31 @@ jobs:
               print('DATASET_FIELD_COUNTS',counts.most_common(35))
             except Exception as e:print('DATASET_ERROR',url,type(e).__name__,str(e)[:200])
           PY
+      - name: Inspect source types and public national feed paths
+        run: |
+          python3 - <<'PY'
+          import urllib.request,re,json,collections
+          def get(url,limit=20000000):
+            with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'}),timeout=80) as r:return r.read(limit)
+          src=get('https://restareaseurope.com/downloads/rest-areas-europe.geojson')
+          d=json.loads(src)
+          cat=collections.Counter((x['properties'].get('type'),x['properties'].get('country')) for x in d['features'])
+          trucks=[x for x in d['features'] if x['properties'].get('type')=='truck_stop']
+          truckparking=[x for x in d['features'] if x['properties'].get('amenities',{}).get('truck_parking')==True]
+          print('TRUCK_STOP_TOTAL',len(trucks),'TRUCK_PARKING_AMENITY_TOTAL',len(truckparking),'NL_TRUCKSTOPS',cat[('truck_stop','NL')])
+          for x in [i for i in trucks if i['properties'].get('country') in ('NL','DE','BE','PL')][:16]:
+            print('TRUCKSTOP_SAMPLE',str(x)[:750])
+          print('TRUCKSTOP_KEYS',collections.Counter(k for x in trucks for k in x['properties']).most_common(30))
+          print('TRUCKPARK_COUNTRIES',collections.Counter(x['properties'].get('country') for x in truckparking).most_common(32))
+          page=get('https://transportial.com/en-us/tools/truck-parking',300000).decode('utf8','replace')
+          js=re.search(r'src="([^"]*assets/index-[^"]+\\.js)"',page)
+          print('TRANSPORTIAL_JS_MATCH',js.group(1) if js else None)
+          if js:
+            code=get('https://transportial.com'+js.group(1),15000000).decode('utf8','replace')
+            urls=sorted(set(re.findall(r'[^"\\\\]{0,120}/data/truck-parking/[^"\\\\]{0,200}',code)))
+            for entry in urls[:30]:print('TRANSPORTIAL_DATA_PATH',entry[:300])
+            print('TRANSPORTIAL_DATA_PATHS_COUNT',len(urls))
+          gr=json.loads(get('https://transportial.com/data/truck-parking/v1/open/gr-nap.json'))
+          print('GREEK_FEED_KEYS',list(gr),'GREEK_ITEMS',len(gr.get('items',[])))
+          print('GREEK_SAMPLE',str(gr.get('items',[])[:2])[:2500])
+          PY

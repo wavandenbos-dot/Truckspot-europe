@@ -1,3 +1,3 @@
-# Derde data-inzicht: Europees GeoJSON schema
+# Vierde onderzoeksrun
 
-Inspectie van ODbL bron voor truckparkeerplaatsen, geen telefoondata of privégegevens.
+Controleer het aantal bruikbare truckstops en officiële nationale toegangspunten in Europa.
