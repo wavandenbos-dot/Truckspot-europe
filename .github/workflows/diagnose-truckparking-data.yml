@@ -66,3 +66,25 @@ jobs:
               print('MATCHED_LINKS',[html.unescape(x) for x in links if re.search('download|json|csv|geo|dataset|parking|truck|area',x,re.I)][:80])
             except Exception as e:print('PAGE_ERROR',url,str(e)[:220])
           PY
+      - name: Inspect European parking GeoJSON structure and official Greek sample
+        run: |
+          python3 - <<'PY'
+          import urllib.request,json,collections
+          for url in ['https://restareaseurope.com/downloads/rest-areas-europe.geojson','https://transportial.com/data/truck-parking/v1/open/gr-nap.json']:
+            try:
+              req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'})
+              with urllib.request.urlopen(req,timeout=75) as response:
+                content=response.read(35000000)
+                print('DATASET_FETCH',url,'HTTP',response.status,'SIZE',len(content))
+              o=json.loads(content)
+              print('DATASET_TOP_KEYS',list(o)[:15] if isinstance(o,dict) else 'LIST','LENGTH',len(o.get('features',[])) if isinstance(o,dict) else len(o))
+              items=o.get('features',[]) if isinstance(o,dict) else o
+              for item in items[:4]:print('DATASET_SAMPLE',str(item)[:1300])
+              counts=collections.Counter()
+              for item in items:
+                if isinstance(item,dict):
+                  for k,v in (item.get('properties') or item).items():
+                    if k in ('type','amenity','category','hgv','truck','overnight','overnight_parking','parking','source','vehicle_type','name'):counts[(k,str(v)[:45])]+=1
+              print('DATASET_FIELD_COUNTS',counts.most_common(35))
+            except Exception as e:print('DATASET_ERROR',url,type(e).__name__,str(e)[:200])
+          PY

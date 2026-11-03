@@ -1,3 +1,3 @@
-# Tweede controle Europese downloadbronnen
+# Derde data-inzicht: Europees GeoJSON schema
 
-Inspecteer de beschikbaarheid van ODbL-parkeerbestanden en downloadlinks. Geen persoonsgegevens of privésleutels.
+Inspectie van ODbL bron voor truckparkeerplaatsen, geen telefoondata of privégegevens.
