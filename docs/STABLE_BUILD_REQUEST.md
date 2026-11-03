@@ -5,6 +5,7 @@ Deze update is alleen voor de bediening en uiterlijk. Android-pakket blijft **eu
 ## Wijzigingen
 - Verplaats **🔒 Beheer** van onder de kaart naar de bovenkant van de app, direct onder het TruckSpot-logo en boven de introductietekst. Nu bereikbaar zonder langs de hele kaart te scrollen.
 - Verwijder de oude badge **V5 • GPS TEST** volledig. Er komt geen andere badge of versietekst op die plek voor terug.
+- Verberg de grote telling **'x vrachtwagenparkings in dit kaartgebied'** die linksboven op de kaart over de zoomknoppen staat. De status blijft voor schermlezers beschikbaar, maar blokkeert het kaartbeeld niet meer.
 - De beveiligde handmatige beoordelingsfunctie uit v1.0.5 en de nauwkeuriger Nederlandse snelwegparkeerregels blijven ongewijzigd.
 
 ## Beheerdersaccount
