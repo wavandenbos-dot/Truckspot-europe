@@ -1,3 +1,3 @@
-# Vijfde inspectie: 24 uur geopende truckparkings
+# Gecontroleerde parkeerplaatsen geocoderen
 
-Zoek naar 24/7-open vrachtwagenparkeerplaatsen met expliciete vrachtwagenparkeerfunctie, voor een verantwoord bronfilter.
+Zoek alleen publiek bekende parkeerterreinen uit betrouwbare operatorbronnen in de noordelijke provincies.
