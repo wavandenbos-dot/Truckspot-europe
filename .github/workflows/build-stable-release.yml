@@ -1,5 +1,9 @@
 name: Stable signed TruckSpot APK — one app icon
 on:
+  push:
+    branches: [main]
+    paths:
+      - docs/STABLE_BUILD_REQUEST.md
   workflow_dispatch:
     inputs:
       version_name:
@@ -117,8 +121,8 @@ jobs:
 
       - name: APK met vaste pakketnaam en eigen ondertekening voorbereiden
         env:
-          VERSION_NAME: ${{ inputs.version_name }}
-          VERSION_CODE: ${{ inputs.version_code }}
+          VERSION_NAME: ${{ inputs.version_name || '1.0.0' }}
+          VERSION_CODE: ${{ inputs.version_code || '100' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -159,7 +163,9 @@ jobs:
           }
           """
           Path('app/build.gradle').write_text(s)
-          print('Stable Android app-ID and signing configuration injected.')
+          label=Path('app/src/main/res/values/strings.xml')
+          label.write_text(re.sub(r'<string name="app_name">.*?</string>', '<string name="app_name">TruckSpot Europe</string>', label.read_text(), count=1))
+          print('Stable Android app-ID, app label and signing configuration injected.')
           PY
       - name: Ondertekende APK compileren
         run: gradle --no-daemon --stacktrace :app:assembleRelease
@@ -175,8 +181,8 @@ jobs:
       - name: APK als download publiceren
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: stable-v${{ inputs.version_name }}
-          name: TruckSpot Europe Stable v${{ inputs.version_name }}
+          tag_name: stable-v${{ inputs.version_name || '1.0.0' }}
+          name: TruckSpot Europe Stable v${{ inputs.version_name || '1.0.0' }}
           body: |
             Dit is de stabiel ondertekende APK. Dit is een nieuwe installatie t.o.v. oude debug-testapps.
             Elke volgende APK uit deze workflow kan deze app bijwerken wanneer dezelfde repository secrets
