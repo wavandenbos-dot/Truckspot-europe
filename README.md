@@ -45,3 +45,12 @@ V15 biedt een overzicht van goedgekeurde gedeelde plekken, een refreshknop en ee
 
 ### V16 — gedeelde Supabase-database verbonden
 Supabase-project `TruckSpot Europe` is aangemaakt in de EU-regio `eu-central-1`. De tabel `public.truckspot_parking_submissions` is actief, beveiligd met RLS; uitsluitend goedgekeurde inzendingen zijn openbaar. Ingebouwde onderzoeksparkings blijven offline beschikbaar. Project URL en **publishable** API-sleutel zijn opgenomen in de app-config (dit zijn publieke clientgegevens, geen beheersleutel). Controleer in Supabase → Authentication → Providers of **Anonymous Sign-Ins** aanstaat voordat je chauffeursinzendingen test. Ongecontroleerde locaties zijn nooit publiek. V16 heeft opnieuw een eigen Android-app-id voor installatie naast oudere testversies.
+
+
+## TruckSpot V17 — blauwe P en nachtrust
+- Blauwe vierkante parkeericonen met witte P.
+- Zoom wijzigt niet langer de aan/uitstand van live GPS volgen; tijdens het pinch-to-zoom gebaar wordt centrering even gepauzeerd.
+- Alleen met expliciete bevestiging vrachtwagenparkeerplaats plus overnachten toegestaan. De 13.323 onderzoeksplekken zijn hiervoor niet geverifieerd, en blijven dus verborgen.
+- Nieuwe eigen truckparkings vragen expliciete bevestiging van toegestaan overnachten.
+- Gedeelde plekken worden pas openbaar wanneer beheerder ook het overnachten goedkeurt.
+- V17 is nog een aparte test-APK: voor toekomstige updates zonder nieuw icoon moet er eerst een vaste Android-ondertekening komen.

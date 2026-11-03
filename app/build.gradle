@@ -5,11 +5,11 @@ android {
     namespace 'eu.truckspot.europe'
     compileSdk 35
     defaultConfig {
-        applicationId 'eu.truckspot.europe.preview16'
+        applicationId 'eu.truckspot.europe.preview17'
         minSdk 26
         targetSdk 35
-        versionCode 18
-        versionName '0.18.0-preview'
+        versionCode 19
+        versionName '0.19.0-preview'
     }
     buildTypes {
         release { minifyEnabled false }

@@ -12,7 +12,8 @@ function addParkingDialog(){
   <div class="wide toolbar"><button class="btn" type="button" data-own="gps">📍 Gebruik mijn GPS</button><button class="btn" type="button" data-own="center">🗺️ Midden van kaart</button></div>
   <label for="add-type">Soort plek<select id="add-type"><option value="parking">🅿️ Parking</option><option value="rustplaats">🛣️ Rustplaats</option></select></label>
   <label for="add-fee">Tarief<select id="add-fee"><option value="unknown">Onbekend</option><option value="free">Gratis</option><option value="paid">Betaald</option></select></label>
-  <label class="check wide"><input id="add-truck" type="checkbox"> 🚛 Ik heb ter plaatse gecontroleerd dat vrachtwagens er mogen staan.</label>
+  <label class="check wide"><input id="add-truck" type="checkbox"> 🚛 Ik heb gecontroleerd dat vrachtwagens hier mogen parkeren.</label>
+  <label class="check wide"><input id="add-overnight" type="checkbox"> 🌙 Ik heb gecontroleerd dat een vrachtwagen hier 's nachts mag blijven staan voor dagelijkse rust.</label>
   <label class="check"><input id="add-toilet" type="checkbox"> 🚻 Toilet</label>
   <label class="check"><input id="add-shower" type="checkbox"> 🚿 Douche</label>
   <label class="check"><input id="add-food" type="checkbox"> 🍽️ Eten</label>
@@ -34,12 +35,13 @@ function saveOwnParking(){
  const name=$('#add-name').value.trim(),lt=$('#add-lat').value.trim(),ln=$('#add-lng').value.trim(),lat=Number(lt),lng=Number(ln);
  if(!name||name.length>80){ownStatus('Vul eerst een naam in (maximaal 80 tekens).',true);return}
  if(!lt||!ln||!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180){ownStatus('Vul geldige GPS-coördinaten in.',true);return}
+ if(!$('#add-truck').checked||!$('#add-overnight').checked){ownStatus('Bevestig eerst dat vrachtwagens hier mogen parkeren én overnachten.',true);return}
  if(!$('#add-stopped').checked){ownStatus('Bevestig dat je veilig stilstaat.',true);return}
  if(state.added.length>=500){ownStatus('Maximaal 500 eigen locaties in deze test.',true);return}
  const spot={
   id:'own-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),
   name,lat,lng,type:$('#add-type').value==='rustplaats'?'rustplaats':'parking',
-  truck:$('#add-truck').checked,fee:$('#add-fee').value,
+  truck:$('#add-truck').checked,overnightClaimed:$('#add-overnight').checked,fee:$('#add-fee').value,
   fac:{toilets:$('#add-toilet').checked,shower:$('#add-shower').checked,food:$('#add-food').checked,security:$('#add-security').checked},
   raw:{operator:'','addr:city':''},
   sourceUrl:'https://www.openstreetmap.org/?mlat='+lat+'&mlon='+lng+'#map=15/'+lat+'/'+lng,

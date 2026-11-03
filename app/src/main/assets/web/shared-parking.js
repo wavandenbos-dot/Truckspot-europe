@@ -26,7 +26,7 @@
   return {id:'shared-'+s.id,name:s.name,lat:s.lat,lng:s.lng,type:s.kind,
    truck:s.truck_verified===true,fee:s.fee||'unknown',
    fac:{toilets:s.toilets===true,shower:s.shower===true,food:s.food===true,security:s.security===true},
-   note:s.notes||'',shared:true,raw:{operator:'','addr:city':''},
+   note:s.notes||'',shared:true,overnightVerified:s.overnight_verified===true,overnightSource:s.overnight_source||'',raw:{operator:'','addr:city':''},
    sourceUrl:'https://www.openstreetmap.org/?mlat='+s.lat+'&mlon='+s.lng+'#map=15/'+s.lat+'/'+s.lng};
  }
  async function refresh(force=false){
@@ -37,8 +37,8 @@
   setStatus('🌍 Goedgekeurde gedeelde parkeerplaatsen ophalen…');
   try{
    const query=new URLSearchParams({
-    select:'id,name,lat,lng,kind,fee,truck_verified,toilets,shower,food,security,notes',
-    status:'eq.approved',lat:'gte.'+Math.max(-90,b.south),lng:'gte.'+Math.max(-180,b.west),
+    select:'id,name,lat,lng,kind,fee,truck_verified,toilets,shower,food,security,notes,overnight_verified,overnight_source',
+    status:'eq.approved',truck_verified:'eq.true',overnight_verified:'eq.true',lat:'gte.'+Math.max(-90,b.south),lng:'gte.'+Math.max(-180,b.west),
     order:'created_at.desc',limit:'200'
    });
    // PostgREST URLSearchParams cannot represent duplicate keys with object constructor:
@@ -48,7 +48,7 @@
    if(!res.ok)throw Error('HTTP '+res.status);
    const rows=await res.json();
    if(!Array.isArray(rows))throw Error('Ongeldig serverantwoord');
-   state.shared=rows.filter(r=>Number.isFinite(r.lat)&&Number.isFinite(r.lng)&&typeof r.name==='string').map(toSpot);
+   state.shared=rows.filter(r=>Number.isFinite(r.lat)&&Number.isFinite(r.lng)&&typeof r.name==='string'&&r.truck_verified===true&&r.overnight_verified===true).map(toSpot);
    draw();
    setStatus('🌍 '+rows.length+' gedeelde, goedgekeurde parkeerplekken in deze omgeving. Nieuwe meldingen verschijnen pas na controle.');
   }catch(e){setStatus('⚠ Gedeelde parkeerplaatsen niet bereikbaar ('+(e.message||'netwerkfout')+'). Je lokale kaart werkt wel.')}
@@ -91,6 +91,7 @@
   const spot=state.added.find(s=>s.id===id);
   if(!spot){tell('Deze parkeerplaats is niet meer op jouw telefoon gevonden.');return}
   if(spot.submittedAt){tell('Deze plek is al ingestuurd voor controle.');return}
+  if(!spot.truck||!spot.overnightClaimed){tell('Je kunt alleen een bewezen vrachtwagenovernachtingsplek insturen.');return}
   if(!configured()){
    showSheet('🌍 Gedeelde database nog niet actief',
      '<p>Je eigen parkeerplaats is veilig op je telefoon bewaard.</p><p>Om hem met andere chauffeurs te delen, moet eerst de centrale TruckSpot-database worden gekoppeld. Dat is nog niet gedaan.</p><p>De knop werkt zodra de Supabase-verbinding is ingesteld.</p>');
@@ -103,7 +104,7 @@
     name:spot.name,lat:spot.lat,lng:spot.lng,
     kind:spot.type==='rustplaats'?'rustplaats':'parking',
     fee:spot.fee==='free'||spot.fee==='paid'?spot.fee:'unknown',
-    truck_verified:spot.truck===true,
+    truck_verified:spot.truck===true,overnight_claimed:spot.overnightClaimed===true,
     toilets:spot.fac.toilets===true,shower:spot.fac.shower===true,
     food:spot.fac.food===true,security:spot.fac.security===true,
     notes:(spot.note||'').slice(0,220)
