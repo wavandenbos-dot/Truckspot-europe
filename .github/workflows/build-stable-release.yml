@@ -93,6 +93,18 @@ jobs:
           print('Supabase public client configuration validated')
           PY
           echo "TruckSpot UI is opgeslagen in de APK; Netlify is niet nodig."
+      - name: Online truckovernachtingszoeken herstellen (1.0.1)
+        shell: bash
+        run: |
+          python3 scripts/patch_verified_overnight_search.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('app/src/main/assets/web/index.html').read_text()
+          parts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S|re.I)
+          Path('/tmp/truckspot-patched.js').write_text('\n'.join(parts))
+          PY
+          node --check /tmp/truckspot-patched.js
       - name: Europees vrachtwagenparkeerbestand in de APK opnemen
         shell: bash
         run: |
@@ -121,8 +133,8 @@ jobs:
 
       - name: APK met vaste pakketnaam en eigen ondertekening voorbereiden
         env:
-          VERSION_NAME: ${{ inputs.version_name || '1.0.0' }}
-          VERSION_CODE: ${{ inputs.version_code || '100' }}
+          VERSION_NAME: ${{ inputs.version_name || '1.0.1' }}
+          VERSION_CODE: ${{ inputs.version_code || '101' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -201,8 +213,8 @@ jobs:
       - name: APK als download publiceren
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: stable-v${{ inputs.version_name || '1.0.0' }}
-          name: TruckSpot Europe Stable v${{ inputs.version_name || '1.0.0' }}
+          tag_name: stable-v${{ inputs.version_name || '1.0.1' }}
+          name: TruckSpot Europe Stable v${{ inputs.version_name || '1.0.1' }}
           body: |
             Dit is de stabiel ondertekende APK. Dit is een nieuwe installatie t.o.v. oude debug-testapps.
             Elke volgende APK uit deze workflow kan deze app bijwerken wanneer dezelfde repository secrets

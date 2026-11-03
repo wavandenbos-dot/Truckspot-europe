@@ -1,3 +1,3 @@
-# Stable signing test v1.0.0 — nieuwe controle na bijwerken sleutel
+# Stable TruckSpot Europe 1.0.1
 
-De gebruiker heeft `TRUCKSPOT_KEYSTORE_B64` opnieuw opgeslagen als beveiligde GitHub repository secret. Deze wijziging activeert uitsluitend een nieuwe controlesessie voor de vaste ondertekende APK. Geheime waarden blijven buiten broncode en logs. Build versionCode: 100.
+Herstelt een fout waarbij GPS en kaartzoeken altijd stopten na het ongeverifieerde Fraunhofer-onderzoekscatalogusbestand. De app doorzoekt nu online gegevens op expliciete truckovernachting-tags, ook bij snelwegen. Onbevestigde rustplaatsen worden niet als toegestaan gepresenteerd; openbare OSM-data kunnen afwijken van actuele borden en openingstijden. Versiecode 101 en dezelfde vaste ondertekening als 1.0.0.
