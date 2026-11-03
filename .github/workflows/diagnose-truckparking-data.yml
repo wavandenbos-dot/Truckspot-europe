@@ -1,0 +1,52 @@
+name: Diagnose official truckparking data
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/TRUCKPARKING_DATA_CHECK.md
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and inspect official NDW truckparking dataset
+        run: |
+          set -euo pipefail
+          curl --fail --retry 2 --location --max-time 35 'https://opendata.ndw.nu/Truckparking_Parking_Table.xml' --output /tmp/ndw_truckparking.xml
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          from collections import Counter
+          from pathlib import Path
+          p=Path('/tmp/ndw_truckparking.xml')
+          root=ET.parse(p).getroot()
+          local=lambda tag:tag.rsplit('}',1)[-1]
+          print('NDW_BYTES',p.stat().st_size,'ROOT',local(root.tag))
+          counts=Counter(local(el.tag) for el in root.iter())
+          print('NDW_TAG_COUNTS',counts.most_common(35))
+          for el in root.iter():
+            if local(el.tag) in ('parkingSite','parkingArea','parkingTable','parkingFacility','parkingRecord'):
+              vals=[(local(e.tag), (e.text or '').strip()[:70]) for e in el.iter() if local(e.tag) in ('parkingName','value','latitude','longitude','parkingType','vehicleType','parkingUsage','parkingScenario','parkingAccess','truckParking','parkingNumberOfSpaces')]
+              print('PARKING_SAMPLE',local(el.tag),el.attrib,'FIELDS',vals[:35])
+          PY
+      - name: Check additional public European source endpoints
+        run: |
+          python3 - <<'PY'
+          import urllib.request,re
+          urls=[
+            'https://restareaseurope.com/rest-areas-europe.geojson',
+            'https://transportial.com/en-us/tools/truck-parking',
+            'https://opendata.ndw.nu/Truckparking_Parking_Table.xml',
+          ]
+          for url in urls:
+            try:
+              req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'})
+              with urllib.request.urlopen(req,timeout=15) as r:
+                chunk=r.read(3000)
+                print('SOURCE',url,'HTTP',r.status,'TYPE',r.headers.get('Content-Type'),'LENGTH',r.headers.get('Content-Length'),'HEAD',chunk[:100])
+                if 'transportial.com' in url:
+                  print('PAGE_LINKS',re.findall(r'href=["\\\']([^"\\\']+)',chunk.decode('utf-8','ignore'))[:20])
+            except Exception as e: print('SOURCE_ERROR',url,type(e).__name__,str(e)[:150])
+          PY
