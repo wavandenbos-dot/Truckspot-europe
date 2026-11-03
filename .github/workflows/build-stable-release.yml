@@ -9,12 +9,12 @@ on:
       version_name:
         description: "Versie, bv. 1.0.0 (verhoog bij elke publicatie)"
         required: true
-        default: "1.0.0"
+        default: "1.0.1"
         type: string
       version_code:
         description: "Versienummer hoger dan vorige build, bv. 100"
         required: true
-        default: "100"
+        default: "101"
         type: string
 permissions:
   contents: write
