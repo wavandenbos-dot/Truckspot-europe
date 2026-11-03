@@ -1,12 +1,12 @@
 'use strict';
 /*
- * TruckSpot Europe 1.0.7 – moderator dashboard and secure admin account registration.
+ * TruckSpot Europe 1.0.8 – compact manual moderation with pending / approved / rejected history.
  * Deliberately uses a separate, short-lived, IN-MEMORY admin session.
  * No moderator identity, password, API service key or role is ever hardcoded.
  * All write decisions are enforced in the Supabase database by RLS.
  */
 (function(){
- let cfg=null,token='',expiresAt=0,admin=false,working=false;
+ let cfg=null,token='',expiresAt=0,admin=false,working=false,selectedTab='pending';
  const btn=document.getElementById('adminopen');
  if(!btn)return;
  const safe=ESC;
@@ -113,9 +113,9 @@ function registrationScreen(info=''){
   }catch(e){forget();loginScreen(String(e.message||'Geen toegang'))}
   finally{working=false}
  }
- async function query(table,columns){
+ async function query(table,columns,tab=selectedTab){
   const c=await config();
-  const params=new URLSearchParams({select:columns,status:'eq.pending',order:'created_at.asc',limit:'80'});
+  const params=new URLSearchParams({select:columns,status:'eq.'+tab,order:tab==='pending'?'created_at.asc':'created_at.desc',limit:'80'});
   const r=await fetch(c.url+'/rest/v1/'+table+'?'+params,{
    headers:header(),cache:'no-store'
   });
@@ -130,7 +130,12 @@ function registrationScreen(info=''){
    +'#map=15/'+encodeURIComponent(r.lat)+'/'+encodeURIComponent(r.lng)
    +'">📍 Kaart bekijken ↗</a>';
  }
- function correctionCard(r){
+ function correctionCard(r,readonly=false){
+  if(readonly)return '<div class="callout"><b>✏️ '+safe(r.spot_name)+'</b> · '+(r.overnight==='yes'?
+    '<b>🌙 Nachtparkeren: JA volgens chauffeur</b>':'⛔ Nachtparkeren: NEE volgens chauffeur')
+    +'<br>Toelichting: '+safe(r.evidence)+'<br><span class="hint">Ingestuurd: '+safe(fmtDate(r.created_at))
+    +' · '+(selectedTab==='approved'?'Goedgekeurd als chauffeursmelding':'Afgewezen')+'</span><br>'
+    +locationLink(r)+'</div>';
   return '<div class="callout"><b>✏️ '+safe(r.spot_name)+'</b><br>'
   +safe(r.overnight==='yes'?'Chauffeur meldt: nachtparkeren toegestaan':'Chauffeur meldt: nachtparkeren niet toegestaan')
   +'<br><b>Uitleg:</b> '+safe(r.evidence)+'<br>'+locationLink(r)
@@ -139,7 +144,13 @@ function registrationScreen(info=''){
   +'<div class="toolbar"><button class="btn primary small" data-admin="approve-correction" data-id="'+safe(r.id)+'">✅ Goedkeuren</button>'
   +'<button class="btn small" data-admin="reject-correction" data-id="'+safe(r.id)+'">✖ Afwijzen</button></div></div>';
  }
- function parkingCard(r){
+ function parkingCard(r,readonly=false){
+  if(readonly)return '<div class="callout"><b>🚛 '+safe(r.name)+'</b> · '
+    +(selectedTab==='approved'?'✅ Goedgekeurd':'❌ Afgewezen')
+    +'<br>Toelichting: '+safe(r.notes||'Geen toelichting')
+    +(selectedTab==='approved'&&r.overnight_source?
+       '<br><b>Bron nachtparkeren:</b> '+safe(r.overnight_source):'')
+    +'<br><span class="hint">Ingestuurd: '+safe(fmtDate(r.created_at))+'</span><br>'+locationLink(r)+'</div>';
   return '<div class="callout"><b>🚛 '+safe(r.name)+'</b><br>'
   +'Soort: '+safe(r.kind)+' · Tarief: '+safe(r.fee)
   +'<br><b>Toelichting chauffeur:</b> '+safe(r.notes||'Geen bron opgegeven')
@@ -152,23 +163,33 @@ function registrationScreen(info=''){
   +'<div class="toolbar"><button class="btn primary small" data-admin="approve-parking" data-id="'+safe(r.id)+'">✅ Goedkeuren na controle</button>'
   +'<button class="btn small" data-admin="reject-parking" data-id="'+safe(r.id)+'">✖ Afwijzen</button></div></div>';
  }
- async function loadQueue(){
+ async function loadQueue(tab=selectedTab){
   if(!allowed()){forget();return loginScreen('Je beheerderssessie is verlopen. Meld je opnieuw aan.')}
+  selectedTab=['pending','approved','rejected'].includes(tab)?tab:'pending';
   try{
    const [corrections,parkings]=await Promise.all([
-    query('truckspot_parking_corrections','id,source_spot_id,spot_name,lat,lng,overnight,evidence,created_at'),
-    query('truckspot_parking_submissions','id,name,lat,lng,kind,fee,truck_verified,overnight_claimed,notes,created_at')
+    query('truckspot_parking_corrections','id,source_spot_id,spot_name,lat,lng,overnight,evidence,created_at',selectedTab),
+    query('truckspot_parking_submissions','id,name,lat,lng,kind,fee,truck_verified,overnight_claimed,overnight_source,notes,created_at',selectedTab)
    ]);
-   showSheet('🔒 TruckSpot – meldingen beoordelen',`
-    <p><b>✏️ ${corrections.length} correcties</b> en <b>🚛 ${parkings.length} nieuwe parkeerplaatsen</b> wachten op controle.</p>
-    <p class="hint">Geen automatische goedkeuring. Controleer regelgeving en bron zorgvuldig; een chauffeursmelding is nooit officiële toestemming.</p>
-    <div class="toolbar"><button class="btn small" data-admin="refresh">↻ Vernieuwen</button><button class="btn small" data-admin="logout">Uitloggen</button></div>
+   const readonly=selectedTab!=='pending';
+   const tabs=[['pending','⏳ Wachtend'],['approved','✅ Goedgekeurd'],['rejected','❌ Afgewezen']];
+   const tabHtml=tabs.map(([id,label])=>
+    '<button class="btn small'+(selectedTab===id?' active':'')+'" type="button" data-admin="tab" data-tab="'+id+
+    '" role="tab" aria-selected="'+(selectedTab===id?'true':'false')+'">'+label+'</button>').join('');
+   showSheet('🔒 Beheer',`
+    <div class="admin-tabs" role="tablist" aria-label="Status van meldingen">${tabHtml}</div>
+    <div class="admin-stats">✏️ <b>${corrections.length}</b> correcties · 🚛 <b>${parkings.length}</b> parkings</div>
+    <div class="toolbar admin-tools">
+     <button class="btn small" data-admin="refresh" type="button">↻ Vernieuwen</button>
+     <button class="btn small" data-admin="logout" type="button">Uitloggen</button>
+    </div>
     <p id="admin-feedback" role="status" aria-live="polite" class="hint"></p>
-    <h3>✏️ Nachtparkeren aanpassen</h3>
-    ${corrections.length?corrections.map(correctionCard).join(''):'<p class="hint">Geen wachtende correcties.</p>'}
-    <h3>🚛 Nieuwe parkeerplaatsen</h3>
-    ${parkings.length?parkings.map(parkingCard).join(''):'<p class="hint">Geen wachtende nieuwe parkeerplaatsen.</p>'}
-    <div class="toolbar"><button class="btn small" data-admin="refresh">↻ Ververs lijst</button><button class="btn small" data-admin="logout">Uitloggen</button></div>
+    <div class="admin-list">
+    ${corrections.length?'<h3>✏️ Correcties</h3>'+corrections.map(r=>correctionCard(r,readonly)).join(''):''}
+    ${parkings.length?'<h3>🚛 Nieuwe parkeerplaatsen</h3>'+parkings.map(r=>parkingCard(r,readonly)).join(''):''}
+    ${!corrections.length&&!parkings.length?'<p class="hint">Geen '+(selectedTab==='pending'?'wachtende':selectedTab==='approved'?'goedgekeurde':'afgewezen')+' meldingen.</p>':''}
+    </div>
+    <p class="hint">${readonly?'Archief: eerdere beoordelingen, alleen lezen.':'Controleer altijd de borden en bron vóór goedkeuring.'} Er worden maximaal 80 meldingen per soort getoond.</p>
    `);
   }catch(e){status(String(e.message||'Database tijdelijk niet bereikbaar'))}
  }
@@ -217,6 +238,7 @@ function registrationScreen(info=''){
   else if(action==='back-login')loginScreen();
   else if(action==='logout'){forget();hideSheet();tell('Beheerderssessie afgesloten')}
   else if(action==='refresh')loadQueue();
+  else if(action==='tab')loadQueue(b.dataset.tab);
   else if(['approve-correction','reject-correction','approve-parking','reject-parking'].includes(action))moderate(action,b.dataset.id);
  });
 })();
