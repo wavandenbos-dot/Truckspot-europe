@@ -50,3 +50,19 @@ jobs:
                   print('PAGE_LINKS',re.findall(r'href=["\\\']([^"\\\']+)',chunk.decode('utf-8','ignore'))[:20])
             except Exception as e: print('SOURCE_ERROR',url,type(e).__name__,str(e)[:150])
           PY
+      - name: Find openly licensed European parking download links
+        run: |
+          python3 - <<'PY'
+          import re,urllib.request,html,json
+          for url in ['https://transportial.com/en-us/tools/truck-parking','https://restareaseurope.com/nl/gegevensbronnen/']:
+            try:
+              req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'})
+              with urllib.request.urlopen(req,timeout=20) as response:s=response.read().decode('utf8','replace')
+              print('PAGE',url,'SIZE',len(s))
+              for pattern in ['geojson','csv','download','json','rest-areas-europe','truck-parking','api/','truckparking']:
+                hits=[m.start() for m in re.finditer(re.escape(pattern),s,re.I)]
+                print('CONTEXT',pattern,'COUNT',len(hits),[s[max(0,i-130):i+230].replace('\\n',' ')[:350] for i in hits[-5:]])
+              links=re.findall(r'(?:href|src)=["\\\']([^"\\\']+)',s,re.I)
+              print('MATCHED_LINKS',[html.unescape(x) for x in links if re.search('download|json|csv|geo|dataset|parking|truck|area',x,re.I)][:80])
+            except Exception as e:print('PAGE_ERROR',url,str(e)[:220])
+          PY
