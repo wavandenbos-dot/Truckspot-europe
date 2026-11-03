@@ -113,8 +113,15 @@ for(const group of cells.values()){
   const m=L.marker(center,{icon}).addTo(state.markers);
   m.bindTooltip(count+' vrachtwagenparkings · tik om in te zoomen');
   if(state.map.getZoom()>=17){
-   const items=group.items.slice(0,20).map(x=>'<li>'+ESC(x.name)+'</li>').join('');
-   m.bindPopup('<b>'+count+' parkeerplaatsen vlak bij elkaar</b><ul>'+items+'</ul><p>Open de locatie via de lijst onder de kaart.</p>');
+   const items=group.items.slice(0,20).map((x,i)=>'<li><button type="button" class="btn small" data-cluster-item="'+i+'">'+ESC(x.name)+'</button></li>').join('');
+   m.bindPopup('<b>'+count+' parkeerplaatsen vlak bij elkaar</b><ul>'+items+'</ul>');
+   m.on('popupopen',event=>{
+    const root=event.popup.getElement();
+    root?.querySelectorAll('[data-cluster-item]').forEach(button=>button.addEventListener('click',()=>{
+     const selected=group.items[Number(button.dataset.clusterItem)];
+     if(selected)openDetails(selected.id);
+    }));
+   });
   }else m.on('click',()=>state.map.setView(center,Math.min(18,state.map.getZoom()+2)));
   continue;
  }
