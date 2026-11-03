@@ -9,12 +9,12 @@ on:
       version_name:
         description: "Versie, bv. 1.0.0 (verhoog bij elke publicatie)"
         required: true
-        default: "1.0.7"
+        default: "1.0.8"
         type: string
       version_code:
         description: "Versienummer hoger dan vorige build, bv. 100"
         required: true
-        default: "107"
+        default: "108"
         type: string
 permissions:
   contents: write
@@ -138,8 +138,8 @@ jobs:
           PY
       - name: APK met vaste pakketnaam en eigen ondertekening voorbereiden
         env:
-          VERSION_NAME: ${{ inputs.version_name || '1.0.7' }}
-          VERSION_CODE: ${{ inputs.version_code || '107' }}
+          VERSION_NAME: ${{ inputs.version_name || '1.0.8' }}
+          VERSION_CODE: ${{ inputs.version_code || '108' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -218,8 +218,8 @@ jobs:
       - name: APK als download publiceren
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: stable-v${{ inputs.version_name || '1.0.7' }}
-          name: TruckSpot Europe Stable v${{ inputs.version_name || '1.0.7' }}
+          tag_name: stable-v${{ inputs.version_name || '1.0.8' }}
+          name: TruckSpot Europe Stable v${{ inputs.version_name || '1.0.8' }}
           body: |
             Dit is de stabiel ondertekende APK. Dit is een nieuwe installatie t.o.v. oude debug-testapps.
             Elke volgende APK uit deze workflow kan deze app bijwerken wanneer dezelfde repository secrets
