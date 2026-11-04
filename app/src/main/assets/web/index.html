@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090e0c"><title>TruckSpot Europe · 1.0.10 | Truckparkeren en overnachten</title>
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090e0c"><title>TruckSpot Europe · 1.0.11 | Truckparkeren en overnachten</title>
 <link rel="stylesheet" href="./vendor/leaflet.css" crossorigin="anonymous">
 <style>
 :root{color-scheme:dark;--bg:#080d0b;--panel:#121c17;--panel2:#18251d;--lime:#71f42a;--lime2:#b7ffa0;--edge:#304335;--muted:#9baf9f;--text:#f2f9f2;--orange:#ffbd3a;--red:#ff6666}
@@ -386,7 +386,7 @@ function showParkingResults(spots, label, mode='map', keepFilters=false) {
   if(window.TruckSpotShared) window.TruckSpotShared.refresh();
   const n=spots.filter(truckOvernightAllowed).length,night=spots.filter(x=>x.overnightVerified===true).length;
   $('#mapstatus').textContent='🚛 '+n+' vrachtwagenparkings '+label+' · 🌙 '+night+' nachtparkings bevestigd';
-  if(!keepFilters)tell(n?n+' vrachtwagenparkeerplaatsen gevonden':'Geen locaties bekend; probeer een ander gebied.');
+  // Quiet background updates: the map shows locations, no repetitive count toast.
 }
 function fallbackQuery(path){
  const p=new URL(path,window.location.origin).searchParams;
