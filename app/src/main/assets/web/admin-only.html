@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="nl"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08140d">
+<title>TruckSpot Europe · Beheer</title>
+<style>
+:root{color-scheme:dark;--lime:#85fa37;--bg:#09130e;--panel:#14241a;--muted:#b5ceb8;--edge:#355842}
+*{box-sizing:border-box}
+html,body{min-height:100%;margin:0;background:var(--bg);color:#f4fff2;font-family:Arial,Helvetica,sans-serif}
+button,input,textarea{font:inherit}
+a{color:#a4ff8c}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--lime);outline-offset:2px}
+main{max-width:680px;margin:auto;padding:16px 13px 30px}
+header{position:sticky;top:0;z-index:10;background:#0b1a11f7;border:1px solid var(--edge);border-radius:15px;padding:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 8px 20px #0009}
+header h1{font-size:19px;line-height:1.2;margin:0;color:var(--lime)}
+header small{display:block;font-size:11px;color:var(--muted);margin-top:5px}
+.btn{border:1px solid #598568;background:#1c3a28;color:#effff0;border-radius:11px;padding:10px 12px;font-weight:800;min-height:44px;cursor:pointer}
+.btn.primary{background:var(--lime);border-color:var(--lime);color:#102310}
+.btn.small{padding:8px 10px;min-height:38px;font-size:12px}
+.btn.wide{width:100%;display:block;margin:9px 0}
+.btn:disabled{opacity:.5}
+.sheet{margin-top:14px;background:var(--panel);border:1px solid var(--edge);border-radius:18px;padding:17px 15px;min-height:220px}
+.sheet h2{font-size:20px;margin:0 0 15px}
+.sheet p{font-size:13px;line-height:1.6;color:#d4e8d9}
+.sheet label{display:block;font-size:13px;line-height:1.45;margin:14px 0 9px}
+.sheet input:not([type=checkbox]),.sheet textarea{width:100%;display:block;margin-top:6px;min-height:43px;border:1px solid #56785b;border-radius:9px;padding:10px;background:#0c1e13;color:white}
+.sheet textarea{min-height:75px}
+.sheet label.check{display:flex;align-items:start;gap:10px;background:#203326;border-radius:9px;padding:10px}
+.sheet label.check input{margin-top:3px;accent-color:var(--lime)}
+.hint{font-size:12px!important;color:#b8d2bf!important;line-height:1.5}
+.callout{border-left:3px solid var(--lime);border-radius:10px;background:#203326;padding:12px;margin:10px 0;font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.callout b{color:#eaffdf}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:9px 0}
+.admin-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:10px 0}
+.admin-tabs .btn{font-size:11px;padding:7px 3px;line-height:1.25}
+.admin-tabs .btn.active{background:#87fc37;color:#072005;border-color:#87fc37}
+.admin-stats{font-size:12px;color:#d3ead4;margin:11px 0}
+.admin-list h3{font-size:16px;margin:14px 0 8px}
+.admin-list .callout{margin:8px 0}
+.admin-tools{margin-bottom:3px}
+#toast{color:#e6ffda;margin:8px 0;font-size:12px}
+@media(min-width:560px){main{padding:28px 22px}.sheet{padding:22px}}
+</style>
+</head><body><main>
+<header><div><h1>🔒 TruckSpot Beheer</h1><small>Afgeschermd meldingenbeheer · alleen gemachtigde beheerder</small></div><button class="btn small" id="adminopen" type="button">🔑 Inloggen</button></header>
+<section class="sheet" aria-label="Beheerdersscherm"><h2 id="sheettitle">Veilig aanmelden</h2>
+<div id="sheetbody"><p>Gebruik jouw persoonlijke beheerdersaccount. Er worden geen parkings automatisch goedgekeurd.</p></div>
+<p id="toast" role="status" aria-live="polite"></p></section>
+</main>
+<script>
+function ESC(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function showSheet(title,html){document.getElementById('sheettitle').textContent=title;document.getElementById('sheetbody').innerHTML=html;window.scrollTo(0,0)}
+function hideSheet(){showSheet('Veilig aanmelden','<p>Kies Inloggen om je meldingen te bekijken.</p>')}
+function tell(msg){document.getElementById('toast').textContent=String(msg)}
+</script>
+<script src="./admin-parking.js"></script>
+<script>document.getElementById('adminopen').click()</script>
+</body></html>

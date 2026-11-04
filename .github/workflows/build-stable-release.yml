@@ -1,4 +1,4 @@
-name: Stable signed TruckSpot APK — one app icon
+name: Signed TruckSpot Europe + private Beheer APKs
 on:
   push:
     branches: [main]
@@ -9,12 +9,12 @@ on:
       version_name:
         description: "Versie, bv. 1.0.0 (verhoog bij elke publicatie)"
         required: true
-        default: "1.0.8"
+        default: "1.0.9"
         type: string
       version_code:
         description: "Versienummer hoger dan vorige build, bv. 100"
         required: true
-        default: "108"
+        default: "109"
         type: string
 permissions:
   contents: write
@@ -61,17 +61,17 @@ jobs:
               'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css' \
               --output app/src/main/assets/web/vendor/leaflet.css
           fi
-          if [ ! -s app/src/main/res/drawable/truckspot_branded_icon.png ]; then
-            python3 - <<'PY'
-          import base64,re
+          test -s branding/truckspot_launcher_160_q70.webp.b64
+          base64 --decode branding/truckspot_launcher_160_q70.webp.b64 > app/src/main/res/drawable/truckspot_branded_icon.webp
+          test -s app/src/main/res/drawable/truckspot_branded_icon.webp
+          python3 - <<'PY'
           from pathlib import Path
-          s=Path('app/src/main/assets/web/index.html').read_text()
-          m=re.search(r'data:image/png;base64,([A-Za-z0-9+/=]+)',s)
-          assert m, "Logo ontbreekt"
-          Path('app/src/main/res/drawable/truckspot_branded_icon.png').write_bytes(base64.b64decode(m.group(1)))
+          icon=Path('app/src/main/res/drawable/truckspot_branded_icon.webp').read_bytes()
+          assert icon[:4]==b'RIFF' and icon[8:12]==b'WEBP' and len(icon)>4000,'TruckSpot icon invalid'
+          print('Chosen TruckSpot logo prepared for Android launcher:',len(icon),'bytes')
           PY
-          fi
-          test -s app/src/main/res/drawable/truckspot_branded_icon.png
+          test -s app/src/main/res/drawable/truckspot_icon.xml
+          test -s app/src/main/res/drawable/truckspot_admin_icon.xml
           grep -q './vendor/leaflet.js' app/src/main/assets/web/index.html
           grep -q 'navigator.geolocation' app/src/main/assets/web/index.html
           node --version
@@ -83,6 +83,14 @@ jobs:
           Path('/tmp/truckspot-inline.js').write_text('\n'.join(parts))
           PY
           node --check /tmp/truckspot-inline.js
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('app/src/main/assets/web/admin-only.html').read_text()
+          parts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S|re.I)
+          Path('/tmp/truckspot-admin-inline.js').write_text('\n'.join(parts))
+          PY
+          node --check /tmp/truckspot-admin-inline.js
           node --check app/src/main/assets/web/own-parking.js
           node --check app/src/main/assets/web/shared-parking.js
           node --check app/src/main/assets/web/admin-parking.js
@@ -138,8 +146,8 @@ jobs:
           PY
       - name: APK met vaste pakketnaam en eigen ondertekening voorbereiden
         env:
-          VERSION_NAME: ${{ inputs.version_name || '1.0.8' }}
-          VERSION_CODE: ${{ inputs.version_code || '108' }}
+          VERSION_NAME: ${{ inputs.version_name || '1.0.9' }}
+          VERSION_CODE: ${{ inputs.version_code || '109' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -204,6 +212,15 @@ jobs:
           label.write_text(re.sub(r'<string name="app_name">.*?</string>', '<string name="app_name">TruckSpot Europe</string>', label.read_text(), count=1))
           print('Stable Android app-ID, app label and signing configuration injected.')
           PY
+      - name: Beheeromgeving buiten de publieke APK houden
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp app/src/main/assets/web/admin-only.html "$RUNNER_TEMP/truckspot-admin-only.html"
+          cp app/src/main/assets/web/admin-parking.js "$RUNNER_TEMP/truckspot-admin-parking.js"
+          rm app/src/main/assets/web/admin-only.html app/src/main/assets/web/admin-parking.js
+          test ! -f app/src/main/assets/web/admin-only.html
+          test ! -f app/src/main/assets/web/admin-parking.js
       - name: Ondertekende APK compileren
         run: gradle --no-daemon --stacktrace :app:assembleRelease
       - name: Handtekening en versie controleren
@@ -215,17 +232,57 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -E "package: name='eu.truckspot.europe.stable'"
           cp "$apk" TruckSpot-Europe-Stable-Signed.apk
+      - name: Aparte, beveiligde TruckSpot Beheer APK bouwen
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$RUNNER_TEMP/truckspot-admin-only.html" app/src/main/assets/web/admin-only.html
+          cp "$RUNNER_TEMP/truckspot-admin-parking.js" app/src/main/assets/web/admin-parking.js
+          python3 - <<'PY'
+          from pathlib import Path
+          gradle = Path('app/build.gradle')
+          build = gradle.read_text()
+          old = "applicationId 'eu.truckspot.europe.stable'"
+          assert build.count(old)==1, 'Unexpected public app ID'
+          gradle.write_text(build.replace(old,"applicationId 'eu.truckspot.europe.admin'"))
+          manifest = Path('app/src/main/AndroidManifest.xml')
+          content = manifest.read_text()
+          old_icon = 'android:icon="@drawable/truckspot_branded_icon"'
+          assert content.count(old_icon)==1
+          manifest.write_text(content.replace(old_icon,'android:icon="@drawable/truckspot_admin_icon"'))
+          strings = Path('app/src/main/res/values/strings.xml')
+          content = strings.read_text()
+          assert '<string name="app_name">TruckSpot Europe</string>' in content
+          strings.write_text(content.replace('<string name="app_name">TruckSpot Europe</string>',
+                                            '<string name="app_name">TruckSpot Beheer</string>'))
+          activity = Path('app/src/main/java/eu/truckspot/europe/MainActivity.java')
+          content = activity.read_text()
+          assert content.count('"/assets/index.html"')==1
+          activity.write_text(content.replace('"/assets/index.html"','"/assets/admin-only.html"'))
+          print('Admin APK has a distinct app ID, app label, icon and admin-only start page.')
+          PY
+          gradle --no-daemon :app:clean :app:assembleRelease
+          apk=app/build/outputs/apk/release/app-release.apk
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -F "package: name='eu.truckspot.europe.admin'"
+          cp "$apk" TruckSpot-Europe-Beheer-Signed.apk
       - name: APK als download publiceren
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: stable-v${{ inputs.version_name || '1.0.8' }}
-          name: TruckSpot Europe Stable v${{ inputs.version_name || '1.0.8' }}
+          tag_name: stable-v${{ inputs.version_name || '1.0.9' }}
+          name: TruckSpot Europe Stable v${{ inputs.version_name || '1.0.9' }}
           body: |
             Dit is de stabiel ondertekende APK. Dit is een nieuwe installatie t.o.v. oude debug-testapps.
             Elke volgende APK uit deze workflow kan deze app bijwerken wanneer dezelfde repository secrets
             en Android app-ID eu.truckspot.europe.stable worden gebruikt met een hogere versionCode.
             Backup van eigen lokale gegevens vereist vóór verwijdering van oude testapps.
-          files: TruckSpot-Europe-Stable-Signed.apk
+            Driver APK heeft geen beheerpagina. Installeer de aparte TruckSpot Beheer APK
+            alleen voor de gemachtigde beheerder; aanmelden en server-side moderatorrol blijven vereist.
+            Nieuwe chauffeurversies blijven eu.truckspot.europe.stable.
+          files: |
+            TruckSpot-Europe-Stable-Signed.apk
+            TruckSpot-Europe-Beheer-Signed.apk
           prerelease: true
           make_latest: false
         env:

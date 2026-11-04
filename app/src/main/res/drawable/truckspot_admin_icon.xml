@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#0C1520" android:pathData="M0,0 L108,0 L108,108 L0,108 Z"/>
+    <path android:fillColor="#15232E" android:pathData="M18,8 L90,8 Q100,8 100,18 L100,90 Q100,100 90,100 L18,100 Q8,100 8,90 L8,18 Q8,8 18,8 Z"/>
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#8CFF20" android:strokeWidth="4"
+        android:pathData="M18,9 L90,9 Q99,9 99,18 L99,90 Q99,99 90,99 L18,99 Q9,99 9,90 L9,18 Q9,9 18,9 Z"/>
+    <!-- Large lock, distinct from the public driver app icon. -->
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#EAFDEF" android:strokeWidth="9"
+        android:pathData="M35,47 L35,37 Q35,18 54,18 Q73,18 73,37 L73,47"/>
+    <path android:fillColor="#7EFF2E" android:pathData="M26,45 L82,45 Q86,45 86,49 L86,82 Q86,87 81,87 L27,87 Q22,87 22,82 L22,49 Q22,45 26,45 Z"/>
+    <path android:fillColor="#0D2014" android:pathData="M49,61 A5,5 0,1 0,59 61 A5,5 0,1 0,49 61 Z M52,64 L56,64 L59,75 L49,75 Z"/>
+</vector>
