@@ -49,7 +49,7 @@ header small{display:block;font-size:11px;color:var(--muted);margin-top:5px}
 </main>
 <script>
 function ESC(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function showSheet(title,html){document.getElementById('sheettitle').textContent=title;document.getElementById('sheetbody').innerHTML=html;window.scrollTo({top:0,behavior:'instant'})}
+function showSheet(title,html){document.getElementById('sheettitle').textContent=title;document.getElementById('sheetbody').innerHTML=html;window.scrollTo(0,0)}
 function hideSheet(){showSheet('Veilig aanmelden','<p>Kies Inloggen om je meldingen te bekijken.</p>')}
 function tell(msg){document.getElementById('toast').textContent=String(msg)}
 </script>
