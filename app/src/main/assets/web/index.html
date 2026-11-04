@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090e0c"><title>TruckSpot Europe · 1.0.9 | Truckparkeren en overnachten</title>
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090e0c"><title>TruckSpot Europe · 1.0.10 | Truckparkeren en overnachten</title>
 <link rel="stylesheet" href="./vendor/leaflet.css" crossorigin="anonymous">
 <style>
 :root{color-scheme:dark;--bg:#080d0b;--panel:#121c17;--panel2:#18251d;--lime:#71f42a;--lime2:#b7ffa0;--edge:#304335;--muted:#9baf9f;--text:#f2f9f2;--orange:#ffbd3a;--red:#ff6666}
@@ -89,7 +89,7 @@ const $=s=>document.querySelector(s);
 const ESC=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const CITIES=[['Nederland • Rotterdam',51.93,4.52],['Nederland • Utrecht',52.09,5.12],['Nederland • Venlo',51.37,6.17],['België • Antwerpen',51.22,4.40],['België • Luik',50.64,5.57],['Duitsland • Dortmund',51.51,7.47],['Duitsland • Hamburg',53.55,10.00],['Duitsland • München',48.14,11.58],['Frankrijk • Parijs',48.86,2.35],['Frankrijk • Lyon',45.76,4.83],['Spanje • Barcelona',41.39,2.17],['Spanje • Madrid',40.42,-3.70],['Portugal • Porto',41.15,-8.61],['Italië • Milaan',45.46,9.19],['Italië • Bologna',44.49,11.34],['Oostenrijk • Wenen',48.21,16.37],['Zwitserland • Zürich',47.38,8.54],['Polen • Poznań',52.41,16.93],['Polen • Warschau',52.23,21.01],['Tsjechië • Praag',50.08,14.44],['Slowakije • Bratislava',48.15,17.11],['Hongarije • Boedapest',47.50,19.04],['Roemenië • Boekarest',44.43,26.10],['Bulgarije • Sofia',42.70,23.32],['Kroatië • Zagreb',45.81,15.98],['Slovenië • Ljubljana',46.06,14.51],['Denemarken • Aarhus',56.16,10.20],['Zweden • Malmö',55.61,13.00],['Noorwegen • Oslo',59.91,10.75],['Finland • Helsinki',60.17,24.94],['Verenigd Koninkrijk • Birmingham',52.49,-1.89],['Ierland • Dublin',53.35,-6.26],['Estland • Tallinn',59.44,24.75],['Letland • Riga',56.95,24.11],['Litouwen • Vilnius',54.69,25.28],['Luxemburg • Luxemburg',49.61,6.13],['Griekenland • Thessaloniki',40.64,22.94]];
 const store={get(k,f){try{return JSON.parse(localStorage.getItem(k))??f}catch{return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
-const state={data:[],reports:store.get('ts3_reports',{}),favs:new Set(store.get('ts3_favs',[])),saved:store.get('ts3_savedspots',{}),filter:{free:false,paid:false,toilets:false,shower:false,food:false,security:false,confirmed:false,reported:false},filterView:'all',query:'',sort:'distance',minutes:store.get('ts3_minutes',45),map:null,markers:null,location:null,gpsMarker:null,gpsCircle:null,gpsWatch:null,gpsNearbyData:[],gpsBusy:false,gpsFollow:false,approachAlerted:{},approachLastAt:0,approachTimer:null,approachLastPosition:null,gpsProgrammaticMove:false,lastGpsAutoAt:0,lastGpsAutoPoint:null,followZooming:false,followZoomResumeAt:0,gpsAge:null,radiusKm:50,shared:[],publicCorrections:{},searchMode:'map',autoParkingRequested:false,searchAttempted:false,searchError:'',lastKey:'',lastFetch:0,pending:false,reloadRequested:false,autoLoadTimer:null,corrections:store.get('ts103_parking_corrections',{})};
+const state={data:[],reports:store.get('ts3_reports',{}),favs:new Set(store.get('ts3_favs',[])),saved:store.get('ts3_savedspots',{}),filter:{free:false,paid:false,toilets:false,shower:false,food:false,security:false,confirmed:false,reported:false},filterView:'all',query:'',sort:'distance',minutes:store.get('ts3_minutes',45),map:null,markers:null,location:null,gpsMarker:null,gpsCircle:null,gpsWatch:null,gpsNearbyData:[],gpsBusy:false,gpsFollow:false,approachAlerted:{},approachLastAt:0,approachTimer:null,approachLastPosition:null,gpsProgrammaticMove:false,lastGpsAutoAt:0,lastGpsAutoPoint:null,followZooming:false,followZoomResumeAt:0,gpsAge:null,radiusKm:50,shared:[],publicCorrections:{},searchMode:'map',autoParkingRequested:false,searchAttempted:false,searchError:'',lastKey:'',lastFetch:0,lastMapFetch:0,mapRetryTimer:null,mapRequestId:0,pending:false,reloadRequested:false,autoLoadTimer:null,corrections:store.get('ts103_parking_corrections',{})};
 state.added=store.get('ts14_own_spots',[]);
 if(!Array.isArray(state.added))state.added=[];
 state.added=state.added.filter(s=>s&&s.userAdded===true&&Number.isFinite(s.lat)&&Number.isFinite(s.lng)&&typeof s.name==='string'&&s.name.length<=80&&s.raw&&s.fac).slice(0,500);
@@ -415,53 +415,88 @@ async function parkingApi(path,timeoutMs=70000){
   throw Error(failures||'Parkeerdata niet beschikbaar');
  }finally{clearTimeout(timer)}
 }
-async function fetchLocations(automatic=false){
+// Every map gesture changes the request generation. Old network replies cannot
+// overwrite the parking markers for a newer map viewport.
+function currentMapKey(){
+ if(!state.map)return '';
+ const b=state.map.getBounds();
+ return [b.getSouth(),b.getWest(),b.getNorth(),b.getEast()]
+   .map(v=>Math.round(v*1000)/1000).join(',');
+}
+function scheduleMapLoad(delay=750){
+ clearTimeout(state.autoLoadTimer);
+ clearTimeout(state.mapRetryTimer);
+ state.autoLoadTimer=setTimeout(()=>fetchLocations(true),Math.max(200,delay));
+}
+async function fetchLocations(automatic=true){
  if(!state.map)return;
  if(state.pending){state.reloadRequested=true;return}
+ clearTimeout(state.mapRetryTimer);
  state.pending=true;
- const bounds=state.map.getBounds();
+ const bounds=state.map.getBounds(),viewKey=currentMapKey();
+ const requestId=++state.mapRequestId;
+ const stillCurrent=()=>state.map&&currentMapKey()===viewKey&&requestId===state.mapRequestId;
  let listed=[];
  try{
-  $('#mapstatus').textContent='🚛 Europese vrachtwagenparkings laden…';
+  $('#mapstatus').textContent='🚛 Parkeerplaatsen voor dit kaartgebied laden…';
   try{
    listed=await trustedCatalogMap(bounds);
-   if(listed.length)showParkingResults(listed,'in dit kaartgebied · ingebouwde Europese bron','map',automatic);
-  }catch(e){console.warn('Ingebouwde parkeerdata niet beschikbaar:',e)}
-    const height=distance({lat:bounds.getSouth(),lng:bounds.getWest()},{lat:bounds.getNorth(),lng:bounds.getWest()});
+   if(!stillCurrent()){state.reloadRequested=true;return}
+   // The built-in catalogue is drawn first, even when the internet is slow.
+   showParkingResults(listed,'in dit kaartgebied · ingebouwde Europese bron','map',true);
+  }catch(e){
+   console.warn('Ingebouwde parkeergegevens:',e);
+  }
+  if(!stillCurrent()){state.reloadRequested=true;return}
+  const height=distance({lat:bounds.getSouth(),lng:bounds.getWest()},{lat:bounds.getNorth(),lng:bounds.getWest()});
   const width=distance({lat:bounds.getSouth(),lng:bounds.getWest()},{lat:bounds.getSouth(),lng:bounds.getEast()});
   if(height>85||width>110){
-   if(!listed.length)$('#mapstatus').textContent='⚠ Zoom verder in (maximaal ±85×110 km) voor online zoeken';
+   $('#mapstatus').textContent='🚛 '+listed.length+' ingebouwde parkings. Zoom verder in voor aanvullende online parkings.';
    return;
   }
-  const key='ts19_bbox_'+bboxKey(),cached=store.get(key,null);
-  if(cached&&Date.now()-cached.at<CACHE_MS){
+  // Keep the cache key tied to the captured viewport, not a potentially
+  // different viewport after an asynchronous request.
+  const key='ts19_bbox_'+viewKey;
+  const cached=store.get(key,null);
+  if(cached&&Array.isArray(cached.items)&&Date.now()-cached.at<CACHE_MS){
    const combined=[...listed,...cached.items.filter(x=>!listed.some(p=>distance(p,x)<0.04))];
-   showParkingResults(combined,'ingebouwd + online cache','map',automatic);return;
-  }
-  if(Date.now()-state.lastFetch<15000){
-   if(!listed.length)tell('Wacht enkele seconden tussen online zoekopdrachten.');
+   if(stillCurrent())showParkingResults(combined,'ingebouwd + online cache','map',true);
    return;
   }
-  state.lastFetch=Date.now();
-  $('#mapstatus').textContent='⏳ Aanvullende online parkeerplaatsen zoeken…';
+  // A throttled search must be retried automatically; previously this branch
+  // returned forever until the driver manually touched the map again.
+  const delay=15000-(Date.now()-state.lastMapFetch);
+  if(delay>0){
+   $('#mapstatus').textContent='🚛 '+listed.length+' ingebouwde parkings · online aanvulling volgt automatisch…';
+   state.mapRetryTimer=setTimeout(()=>{if(stillCurrent())fetchLocations(true)},delay+120);
+   return;
+  }
+  state.lastMapFetch=Date.now();
+  $('#mapstatus').textContent='⏳ Extra online vrachtwagenparkings ophalen…';
   try{
    const b=[bounds.getSouth(),bounds.getWest(),bounds.getNorth(),bounds.getEast()].map(v=>v.toFixed(5)).join(',');
    const spots=await parkingApi('/api/parking?bbox='+encodeURIComponent(b));
-   if(spots.length)store.set(key,{at:Date.now(),items:spots});
+   if(!stillCurrent()){state.reloadRequested=true;return}
+   // Also cache empty replies: no endless network calls when a region has
+   // no additional truck parking entries.
+   store.set(key,{at:Date.now(),items:spots});
    const combined=[...listed,...spots.filter(x=>!listed.some(p=>distance(p,x)<0.04))];
-   showParkingResults(combined,'in dit kaartgebied · ingebouwd + online','map',automatic);
+   showParkingResults(combined,'in dit kaartgebied · ingebouwd + online','map',true);
   }catch(e){
+   if(!stillCurrent()){state.reloadRequested=true;return}
    if(listed.length){
-    $('#mapstatus').textContent='🚛 '+listed.length+' ingebouwde parkings zichtbaar · online bron tijdelijk niet bereikbaar';
+    $('#mapstatus').textContent='🚛 '+listed.length+' ingebouwde parkings · online bron tijdelijk niet bereikbaar';
    }else{
     state.searchError=String(e.message||'netwerkfout');draw();
-    $('#mapstatus').textContent='⚠ Parkeerdata niet geladen: '+state.searchError;
-    tell('Online zoeken mislukt. Probeer later opnieuw.');
+    $('#mapstatus').textContent='⚠ Online parkeergegevens niet bereikbaar. Verschuif de kaart of probeer het later opnieuw.';
    }
   }
  }finally{
   state.pending=false;
-  if(state.reloadRequested){state.reloadRequested=false;clearTimeout(state.autoLoadTimer);state.autoLoadTimer=setTimeout(()=>fetchLocations(true),800)}
+  if(state.reloadRequested){
+   state.reloadRequested=false;
+   scheduleMapLoad(350);
+  }
  }
 }
 function init(){
@@ -475,15 +510,16 @@ function init(){
   const center=state.map.getCenter();
   store.set('ts11_mapview',{lat:center.lat,lng:center.lng,zoom:state.map.getZoom()});
   if(state.gpsProgrammaticMove)return;
-  clearTimeout(state.autoLoadTimer);
-  state.autoLoadTimer=setTimeout(()=>fetchLocations(true),850);
+  ++state.mapRequestId; // invalidate all replies for the old viewport
+  if(state.pending)state.reloadRequested=true;
+  scheduleMapLoad(750);
  });
  state.map.on('dragstart',()=>{state.followZoomResumeAt=Date.now()+15000;state.searchMode='map'});
  state.map.on('zoomstart',()=>{state.followZooming=true});
  state.map.on('zoomend',()=>{state.followZooming=false;state.followZoomResumeAt=Date.now()+15000;state.searchMode='map'});
  if(valid)$('#mapstatus').textContent='✓ Vorige kaartpositie hersteld';
  draw();
- setTimeout(()=>fetchLocations(true),300);
+ scheduleMapLoad(300);
 }
 $('#region').addEventListener('change',e=>{if(e.target.value==='')return;const c=CITIES[+e.target.value];state.searchMode='map';state.map?.setView([c[1],c[2]],11);tell(`Regio ingesteld op ${c[0]}. Parkeerplaatsen laden automatisch.`)});
 $('#googlemap').addEventListener('click',googleCurrentMap);$('#mapexpand').addEventListener('click',toggleBigMap);
