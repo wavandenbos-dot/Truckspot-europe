@@ -89,7 +89,7 @@ const $=s=>document.querySelector(s);
 const ESC=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const CITIES=[['Nederland • Rotterdam',51.93,4.52],['Nederland • Utrecht',52.09,5.12],['Nederland • Venlo',51.37,6.17],['België • Antwerpen',51.22,4.40],['België • Luik',50.64,5.57],['Duitsland • Dortmund',51.51,7.47],['Duitsland • Hamburg',53.55,10.00],['Duitsland • München',48.14,11.58],['Frankrijk • Parijs',48.86,2.35],['Frankrijk • Lyon',45.76,4.83],['Spanje • Barcelona',41.39,2.17],['Spanje • Madrid',40.42,-3.70],['Portugal • Porto',41.15,-8.61],['Italië • Milaan',45.46,9.19],['Italië • Bologna',44.49,11.34],['Oostenrijk • Wenen',48.21,16.37],['Zwitserland • Zürich',47.38,8.54],['Polen • Poznań',52.41,16.93],['Polen • Warschau',52.23,21.01],['Tsjechië • Praag',50.08,14.44],['Slowakije • Bratislava',48.15,17.11],['Hongarije • Boedapest',47.50,19.04],['Roemenië • Boekarest',44.43,26.10],['Bulgarije • Sofia',42.70,23.32],['Kroatië • Zagreb',45.81,15.98],['Slovenië • Ljubljana',46.06,14.51],['Denemarken • Aarhus',56.16,10.20],['Zweden • Malmö',55.61,13.00],['Noorwegen • Oslo',59.91,10.75],['Finland • Helsinki',60.17,24.94],['Verenigd Koninkrijk • Birmingham',52.49,-1.89],['Ierland • Dublin',53.35,-6.26],['Estland • Tallinn',59.44,24.75],['Letland • Riga',56.95,24.11],['Litouwen • Vilnius',54.69,25.28],['Luxemburg • Luxemburg',49.61,6.13],['Griekenland • Thessaloniki',40.64,22.94]];
 const store={get(k,f){try{return JSON.parse(localStorage.getItem(k))??f}catch{return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
-const state={data:[],reports:store.get('ts3_reports',{}),favs:new Set(store.get('ts3_favs',[])),saved:store.get('ts3_savedspots',{}),filter:{free:false,paid:false,toilets:false,shower:false,food:false,security:false,confirmed:false,reported:false},filterView:'all',query:'',sort:'distance',minutes:store.get('ts3_minutes',45),map:null,markers:null,location:null,gpsMarker:null,gpsCircle:null,gpsWatch:null,gpsBusy:false,gpsFollow:false,approachAlerted:{},approachLastAt:0,approachTimer:null,approachLastPosition:null,gpsProgrammaticMove:false,lastGpsAutoAt:0,lastGpsAutoPoint:null,followZooming:false,followZoomResumeAt:0,gpsAge:null,radiusKm:50,shared:[],publicCorrections:{},searchMode:'map',autoParkingRequested:false,searchAttempted:false,searchError:'',lastKey:'',lastFetch:0,pending:false,reloadRequested:false,autoLoadTimer:null,corrections:store.get('ts103_parking_corrections',{})};
+const state={data:[],reports:store.get('ts3_reports',{}),favs:new Set(store.get('ts3_favs',[])),saved:store.get('ts3_savedspots',{}),filter:{free:false,paid:false,toilets:false,shower:false,food:false,security:false,confirmed:false,reported:false},filterView:'all',query:'',sort:'distance',minutes:store.get('ts3_minutes',45),map:null,markers:null,location:null,gpsMarker:null,gpsCircle:null,gpsWatch:null,gpsNearbyData:[],gpsBusy:false,gpsFollow:false,approachAlerted:{},approachLastAt:0,approachTimer:null,approachLastPosition:null,gpsProgrammaticMove:false,lastGpsAutoAt:0,lastGpsAutoPoint:null,followZooming:false,followZoomResumeAt:0,gpsAge:null,radiusKm:50,shared:[],publicCorrections:{},searchMode:'map',autoParkingRequested:false,searchAttempted:false,searchError:'',lastKey:'',lastFetch:0,pending:false,reloadRequested:false,autoLoadTimer:null,corrections:store.get('ts103_parking_corrections',{})};
 state.added=store.get('ts14_own_spots',[]);
 if(!Array.isArray(state.added))state.added=[];
 state.added=state.added.filter(s=>s&&s.userAdded===true&&Number.isFinite(s.lat)&&Number.isFinite(s.lng)&&typeof s.name==='string'&&s.name.length<=80&&s.raw&&s.fac).slice(0,500);
@@ -373,6 +373,7 @@ function showParkingResults(spots, label, mode='map', keepFilters=false) {
   state.searchAttempted=true;state.searchError='';
   state.searchMode=mode;
   state.data=spots;
+  if(mode==='gps')state.gpsNearbyData=spots;
   if(!keepFilters){
    state.filterView='all';
    state.query='';
@@ -383,7 +384,7 @@ function showParkingResults(spots, label, mode='map', keepFilters=false) {
   if(window.TruckSpotShared) window.TruckSpotShared.refresh();
   const n=spots.filter(truckOvernightAllowed).length,night=spots.filter(x=>x.overnightVerified===true).length;
   $('#mapstatus').textContent='🚛 '+n+' vrachtwagenparkings '+label+' · 🌙 '+night+' nachtparkings bevestigd';
-  tell(n?n+' vrachtwagenparkeerplaatsen gevonden':'Geen locaties bekend; probeer een ander gebied.');
+  if(!keepFilters)tell(n?n+' vrachtwagenparkeerplaatsen gevonden':'Geen locaties bekend; probeer een ander gebied.');
 }
 function fallbackQuery(path){
  const p=new URL(path,window.location.origin).searchParams;
@@ -527,7 +528,7 @@ function maybeWarnParkingAhead(pos){
  if(Number.isFinite(speed)&&speed>=0&&speed<2)return;
  if(heading===null)return; // Never claim a place is ahead without travel direction.
  if(now-state.approachLastAt<85000)return; // Avoid distracting frequent alerts.
- const pool=[...state.data,...state.shared,...state.added];
+ const pool=[...state.gpsNearbyData,...state.data,...state.shared,...state.added];
  let pick=null,pickDistance=Infinity;
  for(const s of pool){
   if(!s||s.truck!==true||s.research===true||!Number.isFinite(s.lat)||!Number.isFinite(s.lng))continue;
