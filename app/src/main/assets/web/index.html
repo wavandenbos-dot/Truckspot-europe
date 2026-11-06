@@ -100,7 +100,7 @@ state.added=store.get('ts14_own_spots',[]);
 if(!Array.isArray(state.added))state.added=[];
 state.added=state.added.filter(s=>s&&s.userAdded===true&&Number.isFinite(s.lat)&&Number.isFinite(s.lng)&&typeof s.name==='string'&&s.name.length<=80&&s.raw&&s.fac).slice(0,500);
 if(!state.corrections||Array.isArray(state.corrections)||typeof state.corrections!=='object')state.corrections={};
-const MAX_RESULTS=350, MAP_CATALOG_LIMIT=7000, LIST_LIMIT=160, CACHE_MS=1000*60*30, REPORT_MS=1000*60*90, ENDPOINT='https://overpass-api.de/api/interpreter';
+const MAX_RESULTS=350, MAP_CATALOG_LIMIT=7000, LIST_LIMIT=70, CACHE_MS=1000*60*30, REPORT_MS=1000*60*90, ENDPOINT='https://overpass-api.de/api/interpreter';
 for(let i=0;i<CITIES.length;i++){let o=document.createElement('option');o.value=String(i);o.textContent=CITIES[i][0];$('#region').append(o)}
 function tell(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');clearTimeout(tell.timer);tell.timer=setTimeout(()=>el.classList.remove('show'),4000)}
 function distance(a,b){let rad=x=>x*Math.PI/180,dLat=rad(b.lat-a.lat),dLng=rad(b.lng-a.lng),l1=rad(a.lat),l2=rad(b.lat);let d=2*6371*Math.asin(Math.min(1,Math.sqrt(Math.sin(dLat/2)**2+Math.cos(l1)*Math.cos(l2)*Math.sin(dLng/2)**2)));return d;}
