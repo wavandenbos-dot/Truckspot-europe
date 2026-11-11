@@ -1,33 +1,31 @@
-# TruckSpot Europe 1.0.17 — GPS-follow toont P's zonder handmatig schuiven, gevaarlijke waarschuwing uit
+# TruckSpot Europe 1.0.18 — zichtbare GPS-rijrichting, geen schijnzekerheid over rijbaankant
 
-## Probleem aangetoond door chauffeur
-- Tijdens rijden zijn sommige vrachtwagenparkings pas zichtbaar nadat de chauffeur de kaart handmatig beweegt.
-- De automatische 2km-pop-up geeft regelmatig parkeerplaatsen aan de verkeerde kant van de snelweg als waarschuwing. Dit is een veiligheidsrisico.
+## Verzoek van chauffeur
+Na stabiliseren van het automatisch verschijnen van blauwe P-iconen tijdens het rijden (1.0.17) wil de chauffeur bepalen in welke rijrichting hij rijdt, zodat toekomstige parkeerwaarschuwingen geen parkeerplaatsen aan de overkant van de snelweg tonen.
 
-## Vastgestelde codeoorzaken
-1. `gpsFix()` verplaatst de kaart met `state.gpsProgrammaticMove=true`. De `moveend`-listener negeert bewust GPS-bewegingen en laadt daarom geen nieuwe parkings.
-2. `fetchLocations()` eiste `state.searchMode==='map'`, maar `loadNearMe()` zet die modus tijdens rijden op `gps`. Daardoor wordt de kaart-cache nooit op basis van het nieuwe GPS-viewport aangevuld.
-3. `visible()` sloot in de GPS-stand de bestaande kaart-cache buiten; de lijst bleef op een ouder GPS-bereik hangen.
-4. De 2km-pop-up gebruikt hemelsbrede afstand plus heading. Dit kan NIET bepalen of een parking aan de juiste rijbaan / kant van een gescheiden snelweg ligt.
+## Deze veilige eerste stap
+- GPS-positie op kaart krijgt een **groene koerspijl** die naar de actuele GPS-rijrichting wijst; kaartoriëntatie blijft noord-boven.
+- Rijrichting komt uit de Android GPS-heading bij een plausibele rijsnelheid (>=2,5 m/s), of uit opeenvolgende GPS-posities (minimaal 50m, minimaal 1,5 seconde, maximaal 30s; afgeleide snelheid 2,5–45m/s). Kleine verschillen worden licht gestabiliseerd, scherpe koerswijzigingen niet weggemiddeld.
+- Pijl wordt verborgen bij stilstand (<2m/s), nauwkeurigheid slechter dan 60m of verouderde locatie (>20s), of als de laatste bruikbare koers ouder is dan 6,5s.
+- Een compact, niet-opdringerig tekstveld toont koersrichting (N, NO, O, enz.), graden en herkomst ('GPS-koers' of 'GPS-verplaatsing'). Meldingen worden niet voortdurend hardop aangekondigd.
+- Het tekstveld zegt expliciet **'rijbaankant/toegang nog niet bevestigd'**. Dit is géén map matching en géén bewijs dat de parking via jouw rijbaan bereikbaar is.
+- De gehele koersberekening gebeurt lokaal op de telefoon. Er worden geen nieuwe GPS-posities naar een server gestuurd.
 
-## Reparatie
-- Bij een programmatic GPS-pan vernieuwt `gpsFix()` de kaart in de app zelf: `scheduleMapLoad(250)` zodra het viewport verschuift en er minstens ~350 m vanaf de laatste ophaalpositie of ~5,5 seconden verstreken zijn.
-- Kleine opeenvolgende GPS-stappen tellen ook: drempel voor een afzonderlijke GPS-map-pan is ~5 meter i.p.v. 50 meter. Een reeks van 24-meter GPS-stappen activeert dus alsnog regelmatige automatische updates.
-- `fetchLocations()` mag ook in `gps`-modus de lokale ingebouwde parkeerbestanden voor het huidige kaartgebied laden. Die locaties worden aan `mapSpotCache` toegevoegd zonder zoekmodus en GPS-lijst over te schrijven; dit geldt ook voor optioneel gecachete online aanvullingen.
-- `visible()` gebruikt zowel de GPS-data als de kaart-cache voor de huidige kaartbounds.
-- Bij echte viewport-beweging worden bestaande clusters opnieuw ingedeeld als de kaartpositie een nieuwe gridzone bereikt; dezelfde pins worden niet nodeloos voortdurend opnieuw opgebouwd.
-- **Automatische 2km-approach pop-up is bewust tijdelijk uitgeschakeld**. Er is geen correcte rijbaankant-filter zonder route- / rijbaangeometrie en GPS-map matching; beter geen melding dan een verkeerde waarschuwing. In het scherm **Uitleg** staat dit expliciet vermeld. De UI mag geen onjuiste veiligheidsclaim geven.
-- De chauffeur kan wel op een parking tikken en gratis de Google Maps-route openen; Google Maps is geen specifieke vrachtwagenrouter.
+## Veiligheidsgrens voor latere fase
+- De 2km-approach popup blijft **uitgeschakeld** sinds 1.0.17. De GPS-koers alleen is onvoldoende om een parking aan de juiste snelwegkant te koppelen.
+- Voor automatisch meldingen aanzetten is afzonderlijke, met echte weg-/afrit-topologie gecontroleerde matching nodig: OpenStreetMap wegen met richting en rijbaan, toegangswegen en inrit van parkeerplaatsen, bereikbaarheid via de gevolgde rijbaan, betrouwbaarheidscontrole en tests bij gescheiden rijbanen en afritten. Bij ontbrekende gegevens géén melding.
+- Geen betaald Google Maps-product, Google Cloud-billing of overgenomen TransParking-database. Gratis Google Maps navigatielinks blijven beschikbaar.
+
+## Bestaande functies behouden
+- Offline Europese parkeerbestanden, automatisch verschijnen van blauwe P bij GPS-verplaatsing, voorzieningenfilters, favoriete parkings, opgeslagen gegevens, logo, vaste bediening, aparte beheer-APK.
+- Driver-package `eu.truckspot.europe.stable` en afzonderlijk admin-package `eu.truckspot.europe.admin`, dezelfde signing-keystore. Chauffeur alleen **Bijwerken**; niet verwijderen.
+- Pijl alleen binnen de geopende app en bij GPS-toestemming; geen gegarandeerde werking met app op achtergrond.
 
 ## Tests
-- Inline JavaScript parseert.
-- Gesimuleerde rit: 11 locatie-updates met ~24 m verplaatsing per seconde zonder handmatige mapbeweging => twee door GPS gestarte viewportverversingen.
-- GPS viewport-resultaten worden aan `mapSpotCache` toegevoegd zonder de GPS-modus te wijzigen; geen netwerk nodig voor ingebouwde punten.
-- Automatische aanroep `maybeWarnParkingAhead(pos)` is verwijderd; er blijft geen actieve automatische oproep over.
-- APK-generatie en ondertekening voor publieke driver en aparte admin via bestaande release workflow. Zelfde package IDs, signing secret, favorieten en data blijven behouden.
-
-## Release
-Stable TruckSpot Europe chauffeur **1.0.17**, versionCode **117**, package `eu.truckspot.europe.stable`; een **Bijwerken**-installatie, niet verwijderen. Aparte private app `eu.truckspot.europe.admin` hoeft voor dit probleem niet bijgewerkt te worden.
+- Inline JavaScript gevalideerd.
+- Gesimuleerde GPS-data: stilstand/onbekende richting -> pijl verborgen; verplaatsing oostwaarts na voldoende afstand -> ~90° zichtbaar; GPS-heading 92° -> richting oost; slechte nauwkeurigheid -> pijl verborgen; GPS-koers noord -> 0°.
+- Bevestigd geen automatische aanroep van `maybeWarnParkingAhead()`.
+- Android-stable signed workflow bouwt beide APK's met versionName **1.0.18**, versionCode **118**.
 
 ## Beperkingen
-Geen daadwerkelijke Samsung-wegtest uitgevoerd; de gebruiker moet dit nog stilstaan/veilig testen. Het bestand bevat wel Europese parkeerpunten; brongegevens kunnen nog locaties missen of niet geverifieerde nachtregels bevatten.
+Dit is fase 1 voor begrijpelijke GPS-koers, **niet** de gevraagde volledige herkenning van linker-/rechterrijbaan en bereikbare inrit. Die vraagt routegraph/matcher en echte weggedragtests. Geen claim dat nu correcte 2km-waarschuwingen beschikbaar zijn.
