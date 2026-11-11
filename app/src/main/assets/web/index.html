@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090e0c"><title>TruckSpot Europe · 1.0.17 | Truckparkeren en overnachten</title>
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090e0c"><title>TruckSpot Europe · 1.0.18 | Truckparkeren en overnachten</title>
 <link rel="stylesheet" href="./vendor/leaflet.css" crossorigin="anonymous">
 <style>
 :root{color-scheme:dark;--bg:#080d0b;--panel:#121c17;--panel2:#18251d;--lime:#71f42a;--lime2:#b7ffa0;--edge:#304335;--muted:#9baf9f;--text:#f2f9f2;--orange:#ffbd3a;--red:#ff6666}
@@ -28,7 +28,9 @@ body.map-open{overflow:hidden}
 .gps-panel label{color:#c7f9ce;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .gps-panel select{background:#142b1e;border:1px solid #4d7756;color:white;border-radius:9px;padding:10px 7px;min-height:44px;font-size:14px}
 .gps-panel .warn{color:#ffd99b}
-.gps-ring{background:#269dfd;border:4px solid #e5f7ff;box-shadow:0 0 0 7px #269dfd44;border-radius:50%;width:24px;height:24px}
+.gps-ring{position:relative;background:#269dfd;border:4px solid #e5f7ff;box-shadow:0 0 0 7px #269dfd44;border-radius:50%;width:24px;height:24px}
+.gps-direction-arrow{display:none;pointer-events:none;position:absolute;left:50%;top:50%;width:30px;height:30px;margin-left:-15px;margin-top:-15px;transform:rotate(0deg);transform-origin:50% 50%;text-align:center;line-height:20px;color:#bfff77;font-size:24px;font-weight:1000;text-shadow:0 2px 3px #001b06,1px 1px 0 #05120a}
+.gps-direction-chip{font-size:11px;line-height:1.45;padding:6px 8px;border-radius:8px;background:#162c21;color:#cbe8d1;border:1px solid #365844;flex:1 1 100%}
 #follow[aria-pressed="true"]{background:#275337;color:#d9ffdc;border-color:#81d88d}
 @media(max-width:540px){.gps-panel{padding:9px 10px;gap:7px}.gps-panel #gpsstatus{width:100%;min-width:0}.gps-panel label{width:100%;justify-content:space-between}.toolbar #gps{flex:1}.toolbar #nearby{flex:1}}
 /* 1.0.8: compacte bediening en helder moderatie-overzicht */
@@ -82,7 +84,7 @@ body.map-open{overflow:hidden}
 
 <div class="sticky-controls" id="stickycontrols"><div class="controls"><select id="region" aria-label="Kies een stad in Europa"><option value="">🌍 Kies een regio</option></select><input id="search" aria-label="Zoek in de geladen parkeerlocaties" placeholder="🔎 Zoek in geladen locaties"></div>
 <div class="toolbar ts-main-actions"><button type="button" class="btn primary" id="gps">📍 Vind mij met GPS</button><button type="button" class="btn" id="follow" aria-pressed="false">▶ Volg mij: uit</button><button type="button" class="btn" id="nearby">🅿️ Zoek bij mij</button><button class="btn" id="googlemap">🌍 Google Maps ↗</button><button class="btn" id="filters">⚙ Filters</button><button class="btn" id="time">⏱️ Rijtijd</button></div>
-<div class="gps-panel"><div id="gpsstatus" role="status" aria-live="polite">📍 GPS uit · tik op GPS voor live volgen en parkeermeldingen.</div><label for="radius">Toon parkeerplaatsen binnen <select id="radius" aria-label="Maximale afstand hemelsbreed"><option value="10">10 km</option><option value="25">25 km</option><option value="50" selected>50 km</option><option value="100">100 km</option><option value="0">Alle geladen</option></select></label></div></div>
+<div class="gps-panel"><div id="gpsstatus" role="status" aria-live="polite">📍 GPS uit · tik op GPS voor live volgen.</div><div id="gpsdirection" class="gps-direction-chip" aria-live="off">🧭 Rijrichting onbekend · rijbaankant niet vastgesteld</div><label for="radius">Toon parkeerplaatsen binnen <select id="radius" aria-label="Maximale afstand hemelsbreed"><option value="10">10 km</option><option value="25">25 km</option><option value="50" selected>50 km</option><option value="100">100 km</option><option value="0">Alle geladen</option></select></label></div></div>
 <aside id="parking-approach-alert" class="parking-approach-alert" role="status" aria-live="polite" aria-atomic="true" hidden></aside>
 <div class="mapbox" id="mapbox"><button class="map-expander" id="mapexpand" type="button" aria-pressed="false">⛶ Kaart vergroten</button><div id="map" class="map" aria-label="Interactieve kaart"></div><div id="mapstatus" role="status" class="status-pill">Zoom in of verschuif de kaart om parkings automatisch te laden</div><div class="source">© OpenStreetMap-bijdragers · Truckstop-data: Fraunhofer ISI 2025 (CC BY 4.0) + Overpass • Google Maps opent apart</div></div>
 <div class="credit">GPS werkt na toestemming in deze Android-app. De ingebouwde Europese parkeerlocaties werken zonder internet; kaarttegels en nieuwe online informatie vereisen internet. Laden gebeurt voor een beperkt kaartgebied. Trucktoegang, voorzieningen en tarieven kunnen ontbreken of verouderd zijn. Bron: Fraunhofer ISI (Link, Plötz, Speth, Gnann), European Truck Parking Locations v04, 2025, CC BY 4.0. Posities zijn indicatief; geen live beschikbaarheid.</div></section>
@@ -98,7 +100,7 @@ const $=s=>document.querySelector(s);
 const ESC=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const CITIES=[['Nederland • Rotterdam',51.93,4.52],['Nederland • Utrecht',52.09,5.12],['Nederland • Venlo',51.37,6.17],['België • Antwerpen',51.22,4.40],['België • Luik',50.64,5.57],['Duitsland • Dortmund',51.51,7.47],['Duitsland • Hamburg',53.55,10.00],['Duitsland • München',48.14,11.58],['Frankrijk • Parijs',48.86,2.35],['Frankrijk • Lyon',45.76,4.83],['Spanje • Barcelona',41.39,2.17],['Spanje • Madrid',40.42,-3.70],['Portugal • Porto',41.15,-8.61],['Italië • Milaan',45.46,9.19],['Italië • Bologna',44.49,11.34],['Oostenrijk • Wenen',48.21,16.37],['Zwitserland • Zürich',47.38,8.54],['Polen • Poznań',52.41,16.93],['Polen • Warschau',52.23,21.01],['Tsjechië • Praag',50.08,14.44],['Slowakije • Bratislava',48.15,17.11],['Hongarije • Boedapest',47.50,19.04],['Roemenië • Boekarest',44.43,26.10],['Bulgarije • Sofia',42.70,23.32],['Kroatië • Zagreb',45.81,15.98],['Slovenië • Ljubljana',46.06,14.51],['Denemarken • Aarhus',56.16,10.20],['Zweden • Malmö',55.61,13.00],['Noorwegen • Oslo',59.91,10.75],['Finland • Helsinki',60.17,24.94],['Verenigd Koninkrijk • Birmingham',52.49,-1.89],['Ierland • Dublin',53.35,-6.26],['Estland • Tallinn',59.44,24.75],['Letland • Riga',56.95,24.11],['Litouwen • Vilnius',54.69,25.28],['Luxemburg • Luxemburg',49.61,6.13],['Griekenland • Thessaloniki',40.64,22.94]];
 const store={get(k,f){try{return JSON.parse(localStorage.getItem(k))??f}catch{return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
-const state={data:[],reports:store.get('ts3_reports',{}),favs:new Set(store.get('ts3_favs',[])),saved:store.get('ts3_savedspots',{}),filter:{free:false,paid:false,toilets:false,shower:false,food:false,security:false,wifi:false,fuel:false,shop:false,water:false,power:false,repair:false,laundry:false,confirmed:false,reported:false},filterView:'all',query:'',sort:'distance',minutes:store.get('ts3_minutes',45),map:null,markers:null,location:null,gpsMarker:null,gpsCircle:null,gpsWatch:null,gpsNearbyData:[],gpsBusy:false,gpsFollow:false,approachAlerted:{},approachLastAt:0,approachTimer:null,approachLastPosition:null,gpsProgrammaticMove:false,lastGpsAutoAt:0,lastGpsAutoPoint:null,followZooming:false,followZoomResumeAt:0,gpsAge:null,radiusKm:50,shared:[],publicCorrections:{},searchMode:'map',autoParkingRequested:false,searchAttempted:false,searchError:'',lastKey:'',lastFetch:0,lastMapFetch:0,mapRetryTimer:null,mapRequestId:0,pending:false,reloadRequested:false,autoLoadTimer:null,onlineMapBusy:false,onlineMapLastAt:0,onlineMapFailuresUntil:0,sharedRefreshTimer:null,mapSpotCache:new Map(),lastMarkerSignature:'',sharedRefreshAt:0,lastGpsDrawAt:0,lastGpsDrawPoint:null,lastGpsMapLoadAt:0,lastGpsMapLoadPoint:null,corrections:store.get('ts103_parking_corrections',{})};
+const state={data:[],reports:store.get('ts3_reports',{}),favs:new Set(store.get('ts3_favs',[])),saved:store.get('ts3_savedspots',{}),filter:{free:false,paid:false,toilets:false,shower:false,food:false,security:false,wifi:false,fuel:false,shop:false,water:false,power:false,repair:false,laundry:false,confirmed:false,reported:false},filterView:'all',query:'',sort:'distance',minutes:store.get('ts3_minutes',45),map:null,markers:null,location:null,gpsMarker:null,gpsCircle:null,gpsWatch:null,gpsNearbyData:[],gpsBusy:false,gpsFollow:false,approachAlerted:{},approachLastAt:0,approachTimer:null,approachLastPosition:null,gpsProgrammaticMove:false,lastGpsAutoAt:0,lastGpsAutoPoint:null,followZooming:false,followZoomResumeAt:0,gpsAge:null,radiusKm:50,shared:[],publicCorrections:{},searchMode:'map',autoParkingRequested:false,searchAttempted:false,searchError:'',lastKey:'',lastFetch:0,lastMapFetch:0,mapRetryTimer:null,mapRequestId:0,pending:false,reloadRequested:false,autoLoadTimer:null,onlineMapBusy:false,onlineMapLastAt:0,onlineMapFailuresUntil:0,sharedRefreshTimer:null,mapSpotCache:new Map(),lastMarkerSignature:'',sharedRefreshAt:0,lastGpsDrawAt:0,lastGpsDrawPoint:null,lastGpsMapLoadAt:0,lastGpsMapLoadPoint:null,gpsCoursePoint:null,gpsHeading:null,gpsHeadingAt:0,gpsHeadingSource:null,corrections:store.get('ts103_parking_corrections',{})};
 state.added=store.get('ts14_own_spots',[]);
 if(!Array.isArray(state.added))state.added=[];
 state.added=state.added.filter(s=>s&&s.userAdded===true&&Number.isFinite(s.lat)&&Number.isFinite(s.lng)&&typeof s.name==='string'&&s.name.length<=80&&s.raw&&s.fac).slice(0,500);
@@ -674,7 +676,7 @@ function init(){
 }
 $('#region').addEventListener('change',e=>{if(e.target.value==='')return;const c=CITIES[+e.target.value];state.searchMode='map';state.map?.setView([c[1],c[2]],11);tell(`Regio ingesteld op ${c[0]}. Parkeerplaatsen laden automatisch.`)});
 $('#googlemap').addEventListener('click',googleCurrentMap);$('#mapexpand').addEventListener('click',toggleBigMap);
-$('#search').addEventListener('input',e=>{state.query=e.target.value.trim();draw()});$('#filters').addEventListener('click',openFilters);$('#time').addEventListener('click',openTime);$('#help').addEventListener('click',()=>showSheet('Over TruckSpot Europe V4',`<p>Parkeerplaatsen laden automatisch zodra je de kaart verplaatst of inzoomt. Extra online locaties zijn afhankelijk van een werkende internetverbinding. Dit werkt in geselecteerde kaartgebieden in heel Europa, maar gegevens kunnen ontbreken.</p><p>🟢 Chauffeursmeldingen worden nu alleen op dit apparaat bewaard.<br>⚪ Bezetting zonder eigen melding is onbekend.<br>🚛 Niet elk rustterrein is geschikt voor vrachtwagens.<br>⏱️ Rijtijd is nog niet gekoppeld aan een tachograaf of vrachtwagenrouter.<br>🔐 Beveiligingsvoorzieningen zijn niet geverifieerd.<br>📍 GPS wordt alleen na toestemming gebruikt, in deze versie niet op een TruckSpot-server opgeslagen.<br>⚠ Automatische 2km-parkingswaarschuwingen staan tijdelijk uit: zonder controle van de echte rijbaan kan een parking aan de overkant van de weg verschijnen.</p><div class="callout">De openbare Overpass API is alleen geschikt voor prototypes en beperkt gebruik. Voor een echte Europese app komt er een eigen cachingdienst, Europese parkeerdatabase en een veilig online meldingssysteem.</div><p><b>Bronnen en licenties:</b> <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap-bijdragers (ODbL)</a> en <a href="https://doi.org/10.5281/zenodo.14643147" target="_blank" rel="noopener">Fraunhofer ISI — European Truck Parking Locations v04 (2025), CC BY 4.0; Link, Plötz, Speth en Gnann</a>. Onbevestigde onderzoeksplekken tonen we als mogelijke locatie, niet als gegarandeerde vrachtwagenovernachting.</p>`));
+$('#search').addEventListener('input',e=>{state.query=e.target.value.trim();draw()});$('#filters').addEventListener('click',openFilters);$('#time').addEventListener('click',openTime);$('#help').addEventListener('click',()=>showSheet('Over TruckSpot Europe V4',`<p>Parkeerplaatsen laden automatisch zodra je de kaart verplaatst of inzoomt. Extra online locaties zijn afhankelijk van een werkende internetverbinding. Dit werkt in geselecteerde kaartgebieden in heel Europa, maar gegevens kunnen ontbreken.</p><p>🟢 Chauffeursmeldingen worden nu alleen op dit apparaat bewaard.<br>⚪ Bezetting zonder eigen melding is onbekend.<br>🚛 Niet elk rustterrein is geschikt voor vrachtwagens.<br>⏱️ Rijtijd is nog niet gekoppeld aan een tachograaf of vrachtwagenrouter.<br>🔐 Beveiligingsvoorzieningen zijn niet geverifieerd.<br>📍 GPS wordt alleen na toestemming gebruikt, in deze versie niet op een TruckSpot-server opgeslagen.<br>⚠ De getoonde pijl geeft alleen de GPS-rijrichting aan, niet de bevestigde rijbaankant. Automatische 2km-parkingswaarschuwingen blijven uit tot de route en ingang van een parking betrouwbaar gecontroleerd worden.</p><div class="callout">De openbare Overpass API is alleen geschikt voor prototypes en beperkt gebruik. Voor een echte Europese app komt er een eigen cachingdienst, Europese parkeerdatabase en een veilig online meldingssysteem.</div><p><b>Bronnen en licenties:</b> <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap-bijdragers (ODbL)</a> en <a href="https://doi.org/10.5281/zenodo.14643147" target="_blank" rel="noopener">Fraunhofer ISI — European Truck Parking Locations v04 (2025), CC BY 4.0; Link, Plötz, Speth en Gnann</a>. Onbevestigde onderzoeksplekken tonen we als mogelijke locatie, niet als gegarandeerde vrachtwagenovernachting.</p>`));
 $('#clear').addEventListener('click',()=>{Object.keys(state.filter).forEach(k=>state.filter[k]=false);state.query='';$('#search').value='';draw();tell('Filters gewist')});
 $('#sort').addEventListener('click',()=>{state.sort=state.sort==='distance'?'name':state.sort==='name'?'report':'distance';$('#sort').textContent=state.sort==='name'?'↕ Op naam':state.sort==='report'?'↕ Gemeld':'↕ Dichtstbij';draw()});
 $('#all').addEventListener('click',()=>{state.filterView='all';draw()});$('#fav').addEventListener('click',()=>{state.filterView='favs';draw()});$('#report').addEventListener('click',()=>openReport());$('#close').addEventListener('click',hideSheet);$('#overlay').addEventListener('click',e=>{if(e.target.id==='overlay')hideSheet()});document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('#mapbox').classList.contains('fullmap'))toggleBigMap();else hideSheet()}});
@@ -689,6 +691,64 @@ function bearingTo(a,b){
  return (Math.atan2(y,x)*180/Math.PI+360)%360;
 }
 function headingDiff(a,b){return Math.abs(((a-b+540)%360)-180)}
+// GPS-course (direction of travel), NOT lane/carriageway map matching.
+// No external endpoint receives location from this calculation.
+function gpsHeadingFromFix(pos,point,accuracy){
+ const now=Date.now(),previous=state.gpsCoursePoint;
+ const rawSpeed=pos?.coords?.speed;
+ const stopped=Number.isFinite(rawSpeed)&&rawSpeed>=0&&rawSpeed<2;
+ const timestamp=pos?.timestamp;
+ const fresh=!Number.isFinite(timestamp)||Math.abs(now-timestamp)<=20000;
+ const accurate=accuracy<=60&&fresh;
+ let measured=null,source='';
+ if(accurate&&!stopped&&Number.isFinite(rawSpeed)&&rawSpeed>=2.5
+    &&Number.isFinite(pos?.coords?.heading)&&pos.coords.heading>=0&&pos.coords.heading<360){
+  measured=pos.coords.heading;source='GPS-koers';
+ }
+ if(accurate&&!stopped&&measured===null&&previous&&previous.accuracy<=60){
+  const dt=now-previous.at,km=distance(previous,point);
+  const apparentSpeed=dt>0?km*1000/(dt/1000):0;
+  if(dt>=1500&&dt<=30000&&km>=0.05&&apparentSpeed>=2.5&&apparentSpeed<=45){
+   measured=bearingTo(previous,point);source='GPS-verplaatsing';
+  }
+ }
+ // Accumulate short GPS steps until a sensible distance establishes direction.
+ const gap=previous?now-previous.at:Infinity;
+ const displacement=previous?distance(previous,point):Infinity;
+ if(!previous||gap>30000||displacement>=0.05){
+  state.gpsCoursePoint={lat:point.lat,lng:point.lng,at:now,accuracy};
+ }
+ if(stopped||!accurate){
+  state.gpsHeading=null;state.gpsHeadingSource=null;
+ }else if(measured!==null){
+  const old=state.gpsHeading;
+  if(Number.isFinite(old)&&now-state.gpsHeadingAt<=10000&&headingDiff(old,measured)<40){
+   const delta=((measured-old+540)%360)-180;
+   measured=(old+0.55*delta+360)%360;
+  }
+  state.gpsHeading=measured;
+  state.gpsHeadingAt=now;
+  state.gpsHeadingSource=source;
+ }else if(!Number.isFinite(state.gpsHeading)||now-state.gpsHeadingAt>6500){
+  state.gpsHeading=null;state.gpsHeadingSource=null;
+ }
+ return state.gpsHeading;
+}
+function paintGpsHeading(){
+ const valid=Number.isFinite(state.gpsHeading);
+ const arrow=state.gpsMarker?.getElement?.()?.querySelector('.gps-direction-arrow');
+ if(arrow){
+  arrow.style.display=valid?'block':'none';
+  if(valid)arrow.style.transform='rotate('+Math.round(state.gpsHeading)+'deg)';
+ }
+ const box=$('#gpsdirection');
+ if(box){
+  if(!valid){box.textContent='🧭 Rijrichting onbekend · rijbaankant niet vastgesteld';return}
+  const compass=['N','NO','O','ZO','Z','ZW','W','NW'][Math.round(state.gpsHeading/45)%8];
+  box.textContent='🧭 '+compass+' ('+Math.round(state.gpsHeading)+'°) via '+state.gpsHeadingSource
+   +' · rijbaankant/toegang nog niet bevestigd';
+ }
+}
 function showApproachAlert(spot,km){
  const box=$('#parking-approach-alert');if(!box)return;
  const local=reportFor(spot);
@@ -740,10 +800,11 @@ function gpsFix(pos,moveMap=true){
  if(!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180){gpsStatus('⚠ Ongeldige GPS-positie.',true);return false}
  const accuracy=Math.max(5,Math.min(50000,Number(pos.coords.accuracy)||100));
  state.location={lat,lng};state.gpsAge=Date.now();
+ gpsHeadingFromFix(pos,{lat,lng},accuracy);
  if(state.map&&window.L){
    if(!state.gpsCircle){state.gpsCircle=L.circle([lat,lng],{radius:accuracy,color:'#49aafd',weight:1,fillColor:'#3599ff',fillOpacity:.09,interactive:false}).addTo(state.map)}
    else{state.gpsCircle.setLatLng([lat,lng]);state.gpsCircle.setRadius(accuracy)}
-   if(!state.gpsMarker){const icon=L.divIcon({className:'',html:'<div class="gps-ring" role="img" aria-label="Mijn GPS-locatie"></div>',iconSize:[24,24],iconAnchor:[12,12]});state.gpsMarker=L.marker([lat,lng],{icon,zIndexOffset:2000}).addTo(state.map).bindPopup('📍 Je huidige locatie (GPS)')}
+   if(!state.gpsMarker){const icon=L.divIcon({className:'',html:'<div class="gps-ring" role="img" aria-label="Mijn GPS-locatie"><span class="gps-direction-arrow" aria-hidden="true">▲</span></div>',iconSize:[24,24],iconAnchor:[12,12]});state.gpsMarker=L.marker([lat,lng],{icon,zIndexOffset:2000}).addTo(state.map).bindPopup('📍 Je huidige locatie (GPS)')}
    else state.gpsMarker.setLatLng([lat,lng]);
    if(moveMap&&(!state.gpsFollow||(!state.followZooming&&Date.now()>=state.followZoomResumeAt))){
      const oldCenter=state.map.getCenter();
@@ -764,6 +825,7 @@ function gpsFix(pos,moveMap=true){
      }
    }
  }
+ paintGpsHeading();
  const t=new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
  gpsStatus(`📍 GPS gevonden · nauwkeurigheid ±${Math.round(accuracy)} m · ${t}${state.gpsFollow?' · volgen aan':''} · niet opgeslagen door TruckSpot`);
  // Leaflet moves existing parking markers automatically during GPS pan.
@@ -837,7 +899,7 @@ function requestGps(loadAfter=false){if(!gpsCheck()||state.gpsBusy)return;
  },gpsError,{enableHighAccuracy:true,timeout:20000,maximumAge:15000});
 }
 function setFollow(on){
- if(!on){if(state.gpsWatch!==null){navigator.geolocation.clearWatch(state.gpsWatch);state.gpsWatch=null}state.gpsFollow=false;$('#follow').setAttribute('aria-pressed','false');$('#follow').textContent='▶ Volg mij: uit';if(state.location)gpsStatus('📍 GPS gevonden · volgen gestopt (positie niet opgeslagen)');tell('Live GPS volgen gestopt');return}
+ if(!on){if(state.gpsWatch!==null){navigator.geolocation.clearWatch(state.gpsWatch);state.gpsWatch=null}state.gpsFollow=false;state.gpsHeading=null;state.gpsHeadingSource=null;state.gpsCoursePoint=null;paintGpsHeading();$('#follow').setAttribute('aria-pressed','false');$('#follow').textContent='▶ Volg mij: uit';if(state.location)gpsStatus('📍 GPS gevonden · volgen gestopt (positie niet opgeslagen)');tell('Live GPS volgen gestopt');return}
  if(!gpsCheck())return;
  state.gpsFollow=true;$('#follow').setAttribute('aria-pressed','true');$('#follow').textContent='■ Volg mij: aan';gpsStatus('📍 Live GPS volgen ingeschakeld…');
  state.gpsWatch=navigator.geolocation.watchPosition(pos=>{
