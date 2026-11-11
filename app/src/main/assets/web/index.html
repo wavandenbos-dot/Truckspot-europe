@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090e0c"><title>TruckSpot Europe · 1.0.15 | Truckparkeren en overnachten</title>
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090e0c"><title>TruckSpot Europe · 1.0.16 | Truckparkeren en overnachten</title>
 <link rel="stylesheet" href="./vendor/leaflet.css" crossorigin="anonymous">
 <style>
 :root{color-scheme:dark;--bg:#080d0b;--panel:#121c17;--panel2:#18251d;--lime:#71f42a;--lime2:#b7ffa0;--edge:#304335;--muted:#9baf9f;--text:#f2f9f2;--orange:#ffbd3a;--red:#ff6666}
@@ -426,7 +426,7 @@ async function trustedCatalogNear(lat,lng,radiusKm){
   if(km<=radiusKm)found.push([km,row]);
  }
  found.sort((a,b)=>a[0]-b[0]);
- return found.slice(0,MAX_RESULTS).map(pair=>trustedSpot(pair[1]));
+ return found.map(pair=>trustedSpot(pair[1]));
 }
 async function trustedCatalogMap(bounds){
  const rows=await trustedCatalog(),origin=bounds.getCenter(),found=[];
@@ -435,7 +435,7 @@ async function trustedCatalogMap(bounds){
    found.push([distance(origin,{lat:row[1],lng:row[2]}),row]);
  }
  found.sort((a,b)=>a[0]-b[0]);
- return found.slice(0,MAP_CATALOG_LIMIT).map(pair=>trustedSpot(pair[1]));
+ return found.map(pair=>trustedSpot(pair[1]));
 }
 function researchSpot(row) {
  const [key,lat,lon,category,country,nearbyCity]=row;
@@ -462,7 +462,7 @@ async function catalogNear(lat,lon,radiusKm) {
    if(km<=radiusKm)candidates.push([km,s]);
  }
  candidates.sort((a,b)=>a[0]-b[0]);
- return candidates.slice(0,MAX_RESULTS).map(x=>x[1]);
+ return candidates.map(x=>x[1]);
 }
 async function catalogMap(bounds){
  const data=await truckCatalog();
@@ -475,7 +475,7 @@ async function catalogMap(bounds){
    }
  }
  matches.sort((a,b)=>a[0]-b[0]);
- return matches.slice(0,MAX_RESULTS).map(x=>x[1]);
+ return matches.map(x=>x[1]);
 }
 
 function fromOsm(json) {
@@ -553,20 +553,29 @@ function currentMapKey(){
   .map(v=>Math.round(v*1000)/1000).join(',');
 }
 async function offlineParkings(bounds){
- const zoom=state.map?.getZoom()??9;
- let verified=[],possible=[];
- try{verified=await trustedCatalogMap(bounds)}
- catch(e){console.warn('Ingebouwde HGV-parkings:',e)}
- // At country zoom don't attempt to paint thousands of DOM markers.
- // A closer zoom gives more detail. Never artificially show empty space
- // merely because the current viewport already contains verified entries.
- const verifiedMax=zoom<=5?280:zoom<=8?480:850;
- verified=verified.slice(0,verifiedMax);
- try{
-  const candidates=await catalogMap(bounds);
-  const cap=zoom<=5?130:zoom<=8?200:280;
-  possible=candidates.filter(s=>!verified.some(p=>distance(p,s)<0.18)).slice(0,cap);
- }catch(e){console.warn('Aanvullende ingebouwde locaties:',e)}
+ // No GPS or mobile internet is needed for parking locations shipped in the APK.
+ const [verified,candidates]=await Promise.all([
+  trustedCatalogMap(bounds).catch(e=>{console.warn('HGV-catalogus:',e);return []}),
+  catalogMap(bounds).catch(e=>{console.warn('Onderzoeksbestand:',e);return []})
+ ]);
+ // Clustering in draw() handles rendering; never silently discard source rows.
+ const scale=500;
+ const grid=new Map();
+ for(const s of verified){
+  const key=Math.floor(s.lat*scale)+':'+Math.floor(s.lng*scale);
+  const group=grid.get(key)||[];group.push(s);grid.set(key,group);
+ }
+ const possible=[];
+ for(const p of candidates){
+  const lat=Math.floor(p.lat*scale),lng=Math.floor(p.lng*scale);
+  let duplicate=false;
+  for(let i=-1;i<=1&&!duplicate;i++)
+   for(let j=-1;j<=1&&!duplicate;j++)
+    for(const v of grid.get((lat+i)+':'+(lng+j))||[]){
+     if(distance(v,p)<0.18){duplicate=true;break}
+    }
+  if(!duplicate)possible.push(p);
+ }
  return [...verified,...possible];
 }
 function scheduleMapLoad(delay=550){
@@ -757,51 +766,41 @@ function gpsCheck(){
 }
 
 async function loadNearMe(){
-  if(!state.location){requestGps(true);return}
-  if(!state.map||state.pending)return;
-  
-  state.searchMode='gps';
-  clearTimeout(state.autoLoadTimer);
-  const loc=state.location;
-  const km=(state.radiusKm===10||state.radiusKm===25||state.radiusKm===50||state.radiusKm===100)?state.radiusKm:50;
-  if(!state.gpsFollow||Date.now()>=state.followZoomResumeAt){
-   state.gpsProgrammaticMove=true;
-   try{state.map.panTo([loc.lat,loc.lng],{animate:false})}
-   finally{state.gpsProgrammaticMove=false}
-  }
-  state.lastGpsAutoAt=Date.now();
-  state.lastGpsAutoPoint={lat:loc.lat,lng:loc.lng};
-  state.autoParkingRequested=true;
-  try{
-   $('#mapstatus').textContent='🚛 Truckparkings dichtbij zoeken…';
-   const listed=await trustedCatalogNear(loc.lat,loc.lng,km);
-   if(listed.length){showParkingResults(listed,'binnen '+km+' km · Europese bron','gps');return}
-   // A sparse country still has 13k offline candidate sites across Europe.
-   // Do not leave drivers waiting for a slow Overpass request.
-   const candidates=await catalogNear(loc.lat,loc.lng,km);
-   if(candidates.length){
-    showParkingResults(candidates,'binnen '+km+' km · mogelijke locaties (controleer borden)','gps');
-    return;
-   }
-  }catch(e){console.warn('Offline parkings niet beschikbaar:',e)}
-
-  const key='ts19_gps_'+loc.lat.toFixed(2)+'_'+loc.lng.toFixed(2)+'_'+km;
-  const cached=store.get(key,null);
-  if(cached&&Date.now()-cached.at<CACHE_MS){showParkingResults(cached.items,'binnen '+km+' km uit cache','gps');return}
-  if(Date.now()-state.lastFetch<15000){tell('Wacht enkele seconden tussen zoekopdrachten.');return}
-  state.pending=true;state.searchError='';state.searchAttempted=true;state.lastFetch=Date.now();$('#nearby').disabled=true;
-  $('#mapstatus').textContent='⏳ Parkeerplaatsen binnen '+km+' km van jouw GPS ophalen…';
-  try{
-    const url='/api/parking?lat='+loc.lat.toFixed(5)+'&lon='+loc.lng.toFixed(5)+'&radius='+km;
-    const spots=await parkingApi(url,12000,true);
-    if(spots.length)store.set(key,{at:Date.now(),items:spots});
-    showParkingResults(spots,'binnen '+km+' km','gps');
-  }catch(e){
-    state.searchError=String(e.message||'netwerkfout');draw();
-    $('#mapstatus').textContent='⚠ GPS gevonden, maar parkeerdata ophalen mislukt: '+state.searchError;
-    tell('GPS gevonden, parkeerdata niet beschikbaar.');
-    console.warn('GPS parking query:',e);
-  }finally{state.pending=false;$('#nearby').disabled=false}
+ if(!state.location||!state.map)return;
+ const loc={...state.location};
+ const km=[10,25,50,100].includes(state.radiusKm)?state.radiusKm:50;
+ state.searchMode='gps';
+ clearTimeout(state.autoLoadTimer);
+ // GPS is ONLY a position reference. Both European files are in the APK;
+ // no Overpass or other web request is made for nearby GPS search.
+ if(!state.gpsFollow||Date.now()>=state.followZoomResumeAt){
+  state.gpsProgrammaticMove=true;
+  try{state.map.panTo([loc.lat,loc.lng],{animate:false})}
+  finally{state.gpsProgrammaticMove=false}
+ }
+ state.lastGpsAutoAt=Date.now();
+ state.lastGpsAutoPoint={...loc};
+ state.autoParkingRequested=true;
+ try{
+  const [verified,candidates]=await Promise.all([
+   trustedCatalogNear(loc.lat,loc.lng,km),
+   catalogNear(loc.lat,loc.lng,km)
+  ]);
+  // Important: do not stop at verified locations; the second database may
+  // contain additional, clearly marked possible truck parking locations.
+  const possible=candidates.filter(p=>!verified.some(v=>
+   Math.abs(p.lat-v.lat)<0.002&&Math.abs(p.lng-v.lng)<0.003&&distance(v,p)<0.18));
+  const local=[...verified,...possible];
+  const ids=new Set(local.map(p=>p.id));
+  const previouslyMapped=[...state.mapSpotCache.values()].filter(p=>
+   p&&p.truck===true&&distance(loc,p)<=km&&!ids.has(p.id));
+  const combined=[...local,...previouslyMapped];
+  if(state.location&&distance(loc,state.location)>1)return; // Old GPS callback
+  showParkingResults(combined,'binnen '+km+' km · opgeslagen Europese bestanden','gps',true);
+ }catch(e){
+  console.warn('Ingebouwde parkeerbestanden:',e);
+  $('#mapstatus').textContent='⚠ Ingebouwde parkeerbestanden niet beschikbaar';
+ }
 }
 function requestGps(loadAfter=false){if(!gpsCheck()||state.gpsBusy)return;
  state.gpsBusy=true;$('#gps').disabled=true;$('#gps').textContent='⌛ GPS zoeken…';gpsStatus('📍 Locatie opvragen… geef toestemming op je telefoon.');
