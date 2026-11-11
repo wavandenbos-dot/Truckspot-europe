@@ -747,7 +747,7 @@ function gpsFix(pos,moveMap=true){
    else state.gpsMarker.setLatLng([lat,lng]);
    if(moveMap&&(!state.gpsFollow||(!state.followZooming&&Date.now()>=state.followZoomResumeAt))){
      const oldCenter=state.map.getCenter();
-     const moved=distance({lat:oldCenter.lat,lng:oldCenter.lng},{lat,lng})>0.05;
+     const moved=distance({lat:oldCenter.lat,lng:oldCenter.lng},{lat,lng})>0.005;
      state.gpsProgrammaticMove=true;
      try{state.map.panTo([lat,lng],{animate:false})}
      finally{state.gpsProgrammaticMove=false}
