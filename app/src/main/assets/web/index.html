@@ -766,51 +766,41 @@ function gpsCheck(){
 }
 
 async function loadNearMe(){
-  if(!state.location){requestGps(true);return}
-  if(!state.map||state.pending)return;
-  
-  state.searchMode='gps';
-  clearTimeout(state.autoLoadTimer);
-  const loc=state.location;
-  const km=(state.radiusKm===10||state.radiusKm===25||state.radiusKm===50||state.radiusKm===100)?state.radiusKm:50;
-  if(!state.gpsFollow||Date.now()>=state.followZoomResumeAt){
-   state.gpsProgrammaticMove=true;
-   try{state.map.panTo([loc.lat,loc.lng],{animate:false})}
-   finally{state.gpsProgrammaticMove=false}
-  }
-  state.lastGpsAutoAt=Date.now();
-  state.lastGpsAutoPoint={lat:loc.lat,lng:loc.lng};
-  state.autoParkingRequested=true;
-  try{
-   $('#mapstatus').textContent='🚛 Truckparkings dichtbij zoeken…';
-   const listed=await trustedCatalogNear(loc.lat,loc.lng,km);
-   if(listed.length){showParkingResults(listed,'binnen '+km+' km · Europese bron','gps');return}
-   // A sparse country still has 13k offline candidate sites across Europe.
-   // Do not leave drivers waiting for a slow Overpass request.
-   const candidates=await catalogNear(loc.lat,loc.lng,km);
-   if(candidates.length){
-    showParkingResults(candidates,'binnen '+km+' km · mogelijke locaties (controleer borden)','gps');
-    return;
-   }
-  }catch(e){console.warn('Offline parkings niet beschikbaar:',e)}
-
-  const key='ts19_gps_'+loc.lat.toFixed(2)+'_'+loc.lng.toFixed(2)+'_'+km;
-  const cached=store.get(key,null);
-  if(cached&&Date.now()-cached.at<CACHE_MS){showParkingResults(cached.items,'binnen '+km+' km uit cache','gps');return}
-  if(Date.now()-state.lastFetch<15000){tell('Wacht enkele seconden tussen zoekopdrachten.');return}
-  state.pending=true;state.searchError='';state.searchAttempted=true;state.lastFetch=Date.now();$('#nearby').disabled=true;
-  $('#mapstatus').textContent='⏳ Parkeerplaatsen binnen '+km+' km van jouw GPS ophalen…';
-  try{
-    const url='/api/parking?lat='+loc.lat.toFixed(5)+'&lon='+loc.lng.toFixed(5)+'&radius='+km;
-    const spots=await parkingApi(url,12000,true);
-    if(spots.length)store.set(key,{at:Date.now(),items:spots});
-    showParkingResults(spots,'binnen '+km+' km','gps');
-  }catch(e){
-    state.searchError=String(e.message||'netwerkfout');draw();
-    $('#mapstatus').textContent='⚠ GPS gevonden, maar parkeerdata ophalen mislukt: '+state.searchError;
-    tell('GPS gevonden, parkeerdata niet beschikbaar.');
-    console.warn('GPS parking query:',e);
-  }finally{state.pending=false;$('#nearby').disabled=false}
+ if(!state.location||!state.map)return;
+ const loc={...state.location};
+ const km=[10,25,50,100].includes(state.radiusKm)?state.radiusKm:50;
+ state.searchMode='gps';
+ clearTimeout(state.autoLoadTimer);
+ // GPS is ONLY a position reference. Both European files are in the APK;
+ // no Overpass or other web request is made for nearby GPS search.
+ if(!state.gpsFollow||Date.now()>=state.followZoomResumeAt){
+  state.gpsProgrammaticMove=true;
+  try{state.map.panTo([loc.lat,loc.lng],{animate:false})}
+  finally{state.gpsProgrammaticMove=false}
+ }
+ state.lastGpsAutoAt=Date.now();
+ state.lastGpsAutoPoint={...loc};
+ state.autoParkingRequested=true;
+ try{
+  const [verified,candidates]=await Promise.all([
+   trustedCatalogNear(loc.lat,loc.lng,km),
+   catalogNear(loc.lat,loc.lng,km)
+  ]);
+  // Important: do not stop at verified locations; the second database may
+  // contain additional, clearly marked possible truck parking locations.
+  const possible=candidates.filter(p=>!verified.some(v=>
+   Math.abs(p.lat-v.lat)<0.002&&Math.abs(p.lng-v.lng)<0.003&&distance(v,p)<0.18));
+  const local=[...verified,...possible];
+  const ids=new Set(local.map(p=>p.id));
+  const previouslyMapped=[...state.mapSpotCache.values()].filter(p=>
+   p&&p.truck===true&&distance(loc,p)<=km&&!ids.has(p.id));
+  const combined=[...local,...previouslyMapped];
+  if(state.location&&distance(loc,state.location)>1)return; // Old GPS callback
+  showParkingResults(combined,'binnen '+km+' km · opgeslagen Europese bestanden','gps',true);
+ }catch(e){
+  console.warn('Ingebouwde parkeerbestanden:',e);
+  $('#mapstatus').textContent='⚠ Ingebouwde parkeerbestanden niet beschikbaar';
+ }
 }
 function requestGps(loadAfter=false){if(!gpsCheck()||state.gpsBusy)return;
  state.gpsBusy=true;$('#gps').disabled=true;$('#gps').textContent='⌛ GPS zoeken…';gpsStatus('📍 Locatie opvragen… geef toestemming op je telefoon.');
